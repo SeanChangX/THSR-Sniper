@@ -1,16 +1,17 @@
 
 # THSR-Sniper
 
-```console
-  ________  _______ ____              _____       _                
- /_  __/ / / / ___// __ \            / ___/____  (_)___  ___  _____
-  / / / /_/ /\__ \/ /_/ /  ______    \__ \/ __ \/ / __ \/ _ \/ ___/
- / / / __  /___/ / _, _/  /_____/   ___/ / / / / / /_/ /  __/ /    
-/_/ /_/ /_//____/_/ |_|            /____/_/ /_/_/ .___/\___/_/     
-                                               /_/                 
+```
 
-A modern Python-based automated ticket booking system for Taiwan High Speed Rail (THSR).
-Features intelligent automation, modern CLI interface, and comprehensive booking capabilities.
+        ________  _______ ____              _____       _                
+       /_  __/ / / / ___// __ \            / ___/____  (_)___  ___  _____
+        / / / /_/ /\__ \/ /_/ /  ______    \__ \/ __ \/ / __ \/ _ \/ ___/
+       / / / __  /___/ / _, _/  /_____/   ___/ / / / / / /_/ /  __/ /    
+      /_/ /_/ /_//____/_/ |_|            /____/_/ /_/_/ .___/\___/_/     
+                                                     /_/                 
+
+# A modern Python-based automated ticket booking system for Taiwan High Speed Rail (THSR).
+# Features intelligent automation, modern CLI interface, and comprehensive booking capabilities.
 ```
 
 ## Quick Start
