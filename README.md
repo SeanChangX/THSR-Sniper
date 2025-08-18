@@ -136,15 +136,15 @@ docker compose run --rm thsr-sniper python main.py --times
 ```
 THSR-Sniper/
 ├── thsr_py/                 # Core Python package
-│   ├── __init__.py         # Package initialization
-│   ├── cli.py              # Command line interface with colored banner
-│   ├── schema.py           # Data models and constants
-│   └── flows.py            # Main booking logic and automation
+│   ├── __init__.py          # Package initialization
+│   ├── cli.py               # Command line interface with colored banner
+│   ├── schema.py            # Data models and constants
+│   └── flows.py             # Main booking logic and automation
 ├── main.py                  # Entry point
 ├── requirements.txt         # Python dependencies
-├── Dockerfile              # Container definition
-├── docker-compose.yml      # Docker Compose configuration
-└── README.md               # This file
+├── Dockerfile               # Container definition
+├── docker-compose.yml       # Docker Compose configuration
+└── README.md                
 ```
 
 ### Local Development
