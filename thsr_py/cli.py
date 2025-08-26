@@ -163,6 +163,11 @@ Examples:
         action="store_true", 
         help="List all available departure times with IDs"
     )
+    info_group.add_argument(
+        "--no-ocr",
+        action="store_true",
+        help="Disable automatic captcha OCR recognition, use manual input only"
+    )
 
     args = parser.parse_args()
 

@@ -63,6 +63,7 @@ docker compose run --rm thsr-sniper python main.py \
 ### Information & Utilities
 - `--stations` - List all available stations with IDs
 - `--times` - List all available departure times with IDs
+- `--no-ocr` - Disable automatic captcha OCR recognition, use manual input only
 
 ## Date Format Support
 
@@ -138,12 +139,19 @@ THSR-Sniper/
 ├── thsr_py/                 # Core Python package
 │   ├── __init__.py          # Package initialization
 │   ├── cli.py               # Command line interface with colored banner
-│   ├── schema.py            # Data models and constants
-│   └── flows.py             # Main booking logic and automation
+│   ├── flows.py             # Main booking logic and automation
+│   └── schema.py            # Data models and constants
+├── thsr_ocr/                # OCR module for captcha recognition
+│   ├── captcha_ocr.py       # Captcha OCR training
+│   ├── download_captcha.py  # Download captcha images
+│   ├── prediction_model.py  # Convert full model to prediction-only model (without CTC layer)
+│   ├── test_model.py        # Test OCR recognition flow
+│   ├── datasets/            # Image processing utilities
+│   └── *.keras              # Trained OCR models
 ├── main.py                  # Entry point
 ├── requirements.txt         # Python dependencies
-├── Dockerfile               # Container definition
 ├── docker-compose.yml       # Docker Compose configuration
+├── Dockerfile               # Container definition
 └── README.md                
 ```
 
@@ -155,6 +163,14 @@ pip install -r requirements.txt
 # Run locally
 python main.py --help
 ```
+
+## Technical Details
+
+### Captcha OCR Overview
+
+- Automatically recognizes THSR captchas, up to 3 attempts before manual input
+- Uses a deep learning model (CNN+LSTM+CTC) tailored for THSR captchas
+- Supports THSR-specific alphanumeric characters, input size 160x50 grayscale
 
 ## Disclaimer
 

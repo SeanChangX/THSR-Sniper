@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
+from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
@@ -200,7 +202,7 @@ def run(args) -> None:
     payload.select_seat_prefer(getattr(args, "seat_prefer", None))
     payload.select_class_type(getattr(args, "class_type", None))
 
-    payload.input_security_code()
+    payload.input_security_code(img_r.content, not getattr(args, "no_ocr", False))
 
     # Submit booking request
     _print_section("Step 4: Submitting Booking Request")
@@ -410,7 +412,17 @@ class _BookingPayload:
         )
         self.class_type = class_type if class_type in (0, 1) else 0
 
-    def input_security_code(self) -> None:
+    def input_security_code(self, img_bytes: Optional[bytes] = None, use_ocr: bool = True) -> None:
+        """Input security code with OCR auto-recognition and manual fallback."""
+        if img_bytes and use_ocr:
+            # Try OCR first
+            print("\nAttempting automatic captcha recognition...")
+            ocr_result = _try_ocr_captcha(img_bytes)
+            if ocr_result:
+                self.security_code = ocr_result
+                return
+        
+        # Fallback to manual input
         print("\nEnter the security code from the captcha image:")
         code = input("> ").strip()
         self.security_code = code
@@ -667,6 +679,97 @@ def _show_result(soup: BeautifulSoup) -> None:
     print("   1. Complete payment using the PNR code")
     print("   2. Collect your ticket at the station")
     print("   3. Enjoy your journey!")
+
+
+def _try_ocr_captcha(img_bytes: bytes, max_attempts: int = 3) -> Optional[str]:
+    """Try to recognize captcha using OCR model with retry mechanism."""
+    try:
+        # Suppress TensorFlow logging for cleaner output
+        import logging
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TF messages
+        logging.getLogger('tensorflow').setLevel(logging.ERROR)
+        
+        # Try to import OCR dependencies
+        sys.path.append(str(Path(__file__).parent.parent / "thsr_ocr"))
+        from test_model import CaptchaModelTester
+        from datasets.image_processor import process_image
+        
+        # Create temporary file for the captcha image
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp_file:
+            temp_file.write(img_bytes)
+            temp_image_path = temp_file.name
+        
+        try:
+            # Initialize OCR model
+            model_path = str(Path(__file__).parent.parent / "thsr_ocr" / "thsr_prediction_model_250827.keras")
+            if not os.path.exists(model_path):
+                print("   OCR model not found, falling back to manual input")
+                return None
+            
+            print("   Loading OCR model...")
+            tester = CaptchaModelTester(model_path)
+            
+            for attempt in range(max_attempts):
+                try:
+                    if attempt == 0:
+                        print("   Recognizing captcha...")
+                    else:
+                        print(f"   Retry attempt {attempt + 1}/{max_attempts}...")
+                    
+                    # Process image using the same processor as training  
+                    # Suppress image processing output for cleaner CLI
+                    import warnings
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        processed_img = process_image(
+                            temp_image_path,
+                            target_size=(160, 50),  # Model input size
+                            mode='balanced',  # Use balanced processing mode
+                            preview=False
+                        )
+                    
+                    # Save processed image for prediction
+                    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as processed_file:
+                        processed_img.save(processed_file.name, 'JPEG', quality=95)
+                        processed_path = processed_file.name
+                    
+                    try:
+                        # Predict using OCR model
+                        prediction = tester.predict_image(processed_path)
+                        
+                        if prediction and len(prediction.strip()) >= 3:  # Basic validation
+                            print(f"   ✓ OCR success: {prediction}")
+                            return prediction.strip()
+                        else:
+                            print(f"   ✗ OCR failed, result too short: '{prediction}'")
+                    
+                    finally:
+                        # Clean up processed image
+                        try:
+                            os.unlink(processed_path)
+                        except:
+                            pass
+                            
+                except Exception as e:
+                    print(f"   ✗ OCR attempt {attempt + 1} failed: {e}")
+                    if attempt == max_attempts - 1:
+                        print("   ✗ All OCR attempts failed, fallback to manual input")
+            
+            return None
+            
+        finally:
+            # Clean up temporary image
+            try:
+                os.unlink(temp_image_path)
+            except:
+                pass
+                
+    except ImportError as e:
+        print(f"   OCR dependencies unavailable, fallback to manual input")
+        return None
+    except Exception as e:
+        print(f"   OCR initialization failed, fallback to manual input")
+        return None
 
 
 def _show_image(img_bytes: bytes) -> None:

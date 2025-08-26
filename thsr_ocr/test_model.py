@@ -138,7 +138,15 @@ class CaptchaModelTester:
     
     def load_model(self):
         """Load the trained model and set up character mappings"""
-        print(f"Loading model from: {self.model_path}")
+        # Suppress TensorFlow logs during model loading
+        import logging
+        import os
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+        logging.getLogger('tensorflow').setLevel(logging.ERROR)
+        
+        # Only print if verbose mode (not used in CLI)
+        if os.environ.get('THSR_VERBOSE', '0') == '1':
+            print(f"Loading model from: {self.model_path}")
         
         if not os.path.exists(self.model_path):
             raise FileNotFoundError(f"Model file not found: {self.model_path}")
@@ -157,7 +165,8 @@ class CaptchaModelTester:
         try:
             # Strategy 1: Try loading with custom objects (full model)
             self.model = keras.models.load_model(self.model_path, custom_objects=custom_objects)
-            print("Full model loaded successfully")
+            if os.environ.get('THSR_VERBOSE', '0') == '1':
+                print("Full model loaded successfully")
             
             # Create prediction model (without CTC layer)
             try:
@@ -165,21 +174,26 @@ class CaptchaModelTester:
                     self.model.input[0], 
                     self.model.get_layer(name="dense2").output
                 )
-                print("Prediction model created from full model")
+                if os.environ.get('THSR_VERBOSE', '0') == '1':
+                    print("Prediction model created from full model")
             except Exception as e:
-                print(f"Could not extract prediction model: {e}")
+                if os.environ.get('THSR_VERBOSE', '0') == '1':
+                    print(f"Could not extract prediction model: {e}")
                 self.prediction_model = self.model
                 
         except Exception as e:
-            print(f"Could not load as full model: {e}")
+            if os.environ.get('THSR_VERBOSE', '0') == '1':
+                print(f"Could not load as full model: {e}")
             
             # Strategy 2: Try loading as prediction-only model
             try:
                 self.prediction_model = keras.models.load_model(self.model_path)
-                print("Prediction model loaded directly")
+                if os.environ.get('THSR_VERBOSE', '0') == '1':
+                    print("Prediction model loaded directly")
                 self.model = self.prediction_model
             except Exception as e2:
-                print(f"Could not load model with any strategy: {e2}")
+                if os.environ.get('THSR_VERBOSE', '0') == '1':
+                    print(f"Could not load model with any strategy: {e2}")
                 raise e2
         
         # Set up character mappings (from actual training data)
