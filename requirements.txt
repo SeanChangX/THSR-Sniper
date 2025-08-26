@@ -3,3 +3,6 @@ beautifulsoup4==4.12.3
 opencv-python==4.8.1.78
 Pillow==10.0.1
 numpy>=1.21.0
+tensorflow>=2.13.0
+keras>=2.13.0
+matplotlib>=3.5.0
