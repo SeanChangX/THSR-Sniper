@@ -7,3 +7,6 @@
 # Ignore tmp files
 **/tmp/*
 !**/tmp/.gitkeep
+
+# Ignore datasets
+thsr_ocr/datasets/20250825
