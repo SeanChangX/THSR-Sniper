@@ -131,7 +131,7 @@ def process_image(image_path, target_size=(160, 50), mode='balanced', preview=Fa
         print(f"Processing mode: {mode}")
     
     # Step 1: Noise reduction
-    print("Applying noise reduction...")
+    # print("Applying noise reduction...")
     if mode == 'gentle':
         # Very light median filter
         denoised = canvas.filter(ImageFilter.MedianFilter(size=3))
@@ -143,7 +143,7 @@ def process_image(image_path, target_size=(160, 50), mode='balanced', preview=Fa
         denoised = canvas.filter(ImageFilter.MedianFilter(size=5))
     
     # Step 2: Line removal based on mode
-    print("Applying line removal...")
+    # print("Applying line removal...")
     if mode == 'gentle':
         # No line removal, just basic processing
         no_lines = denoised
@@ -155,7 +155,7 @@ def process_image(image_path, target_size=(160, 50), mode='balanced', preview=Fa
         no_lines = aggressive_line_removal(denoised)
     
     # Step 3: Contrast enhancement based on mode
-    print("Enhancing contrast...")
+    # print("Enhancing contrast...")
     if mode == 'gentle':
         contrast_factor = 1.3
     elif mode == 'balanced':
@@ -171,7 +171,7 @@ def process_image(image_path, target_size=(160, 50), mode='balanced', preview=Fa
     enhanced = brightness_enhancer.enhance(1.1)
     
     # Step 5: Sharpening based on mode
-    print("Applying sharpening...")
+    # print("Applying sharpening...")
     if mode == 'gentle':
         sharpened = enhanced.filter(ImageFilter.UnsharpMask(radius=1, percent=110, threshold=8))
     elif mode == 'balanced':

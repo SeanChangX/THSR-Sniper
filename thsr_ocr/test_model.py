@@ -221,8 +221,8 @@ class CaptchaModelTester:
             vocabulary=self.char_to_num.get_vocabulary(), mask_token=None, invert=True
         )
         
-        print(f"Character mappings set up ({len(characters)} characters)")
-        print(f"Characters: {characters}")
+        # print(f"Character mappings set up ({len(characters)} characters)")
+        # print(f"Characters: {characters}")
     
     def preprocess_image(self, image_path):
         """

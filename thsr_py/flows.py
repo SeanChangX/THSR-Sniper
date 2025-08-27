@@ -26,10 +26,60 @@ CONFIRM_TICKET_URL = (
 
 
 def _print_header(title: str) -> None:
-    """Print a formatted header."""
-    print(f"\n{'='*60}")
-    print(f"  {title}")
-    print(f"{'='*60}")
+    """Print a formatted header with THSR banner."""
+    if title == "THSR-Sniper":
+        # Display full THSR banner like in CLI
+        _print_thsr_banner()
+    else:
+        # Regular header for other sections
+        print(f"\n{'='*60}")
+        print(f"  {title}")
+        print(f"{'='*60}")
+
+
+def _print_thsr_banner() -> None:
+    """Print the THSR-Sniper banner with colors."""
+    # Check if we're in a terminal that supports colors
+    if os.environ.get('TERM') and '256' in os.environ.get('TERM', ''):
+        # ANSI color codes for 256-color terminals - using THSR theme color #ca4f0f
+        thsr_red = '\033[38;5;166m'  # Close to #ca4f0f
+        reset = '\033[0m'
+        
+        banner = f"""{thsr_red}╔══════════════════════════════════════════════════════════════════════════════╗{reset}
+{thsr_red}║       ________  _______ ____              _____       _                      ║{reset}
+{thsr_red}║      /_  __/ / / / ___// __ \\            / ___/____  (_)___  ___  _____      ║{reset}
+{thsr_red}║       / / / /_/ /\\__ \\/ /_/ /  ______    \\__ \\/ __ \\/ / __ \\/ _ \\/ ___/      ║{reset}
+{thsr_red}║      / / / __  /___/ / _, _/  /_____/   ___/ / / / / / /_/ /  __/ /          ║{reset}
+{thsr_red}║     /_/ /_/ /_//____/_/ |_|            /____/_/ /_/_/ .___/\\___/_/           ║{reset}
+{thsr_red}║                                                    /_/                       ║{reset}
+{thsr_red}║                                                                              ║{reset}
+{thsr_red}║                    Taiwan High Speed Rail Ticket Sniper                      ║{reset}
+{thsr_red}║                                                                              ║{reset}
+{thsr_red}║    A modern CLI tool for booking THSR tickets with intelligent automation.   ║{reset}
+{thsr_red}║    Features automatic captcha recognition and comprehensive booking flow.    ║{reset}
+{thsr_red}║                                                                              ║{reset}
+{thsr_red}╚══════════════════════════════════════════════════════════════════════════════╝{reset}
+        """
+        print(banner)
+    else:
+        # Fallback for terminals without color support
+        banner = r"""
+╔══════════════════════════════════════════════════════════════════════════════╗
+║       ________  _______ ____              _____       _                      ║
+║      /_  __/ / / / ___// __ \            / ___/____  (_)___  ___  _____      ║
+║       / / / /_/ /\__ \/ /_/ /  ______    \__ \/ __ \/ / __ \/ _ \/ ___/      ║
+║      / / / __  /___/ / _, _/  /_____/   ___/ / / / / / /_/ /  __/ /          ║
+║     /_/ /_/ /_//____/_/ |_|            /____/_/ /_/_/ .___/\___/_/           ║
+║                                                    /_/                       ║
+║                                                                              ║
+║                    Taiwan High Speed Rail Ticket Sniper                      ║
+║                                                                              ║
+║    A modern CLI tool for booking THSR tickets with intelligent automation.   ║
+║    Features automatic captcha recognition and comprehensive booking flow.    ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+        """
+        print(banner)
 
 
 def _print_section(title: str) -> None:
@@ -192,12 +242,23 @@ def run(args) -> None:
     payload.select_date(start_date, end_date, getattr(args, "date", None))
     payload.select_time(getattr(args, "time", None))
 
-    if getattr(args, "adult_cnt", None) is None and getattr(args, "student_cnt", None) is None:
+    # Handle ticket selection logic properly
+    adult_cnt = getattr(args, "adult_cnt", None)
+    student_cnt = getattr(args, "student_cnt", None)
+    
+    if adult_cnt is None and student_cnt is None:
+        # No tickets specified, default to 1 adult ticket
         payload.select_ticket_num(TicketType.Adult, None)
-    if getattr(args, "adult_cnt", None) is not None:
-        payload.select_ticket_num(TicketType.Adult, getattr(args, "adult_cnt", None))
-    if getattr(args, "student_cnt", None) is not None:
-        payload.select_ticket_num(TicketType.College, getattr(args, "student_cnt", None))
+    else:
+        # Tickets specified, use explicit counts
+        if adult_cnt is not None:
+            payload.select_ticket_num(TicketType.Adult, adult_cnt)
+        elif student_cnt is not None:
+            # If only student tickets specified, set adult tickets to 0
+            payload.select_ticket_num(TicketType.Adult, 0)
+        
+        if student_cnt is not None:
+            payload.select_ticket_num(TicketType.College, student_cnt)
 
     payload.select_seat_prefer(getattr(args, "seat_prefer", None))
     payload.select_class_type(getattr(args, "class_type", None))
@@ -278,7 +339,7 @@ class _BookingPayload:
     inbound_time: Optional[str] = None
     to_train_id: Optional[int] = None
     back_train_id: Optional[int] = None
-    adult_ticket_num: str = "1F"
+    adult_ticket_num: str = "0F"
     child_ticket_num: str = "0H"
     disabled_ticket_num: str = "0W"
     elder_ticket_num: str = "0E"
@@ -641,8 +702,21 @@ def _show_result(soup: BeautifulSoup) -> None:
     
     # PNR Code
     pnr = soup.select_one("p.pnr-code span").get_text(strip=True)
-    print(f"\nPNR Code: {pnr}")
-    print("   Use this code for payment and ticket pickup")
+    
+    # Use bright colors for PNR code
+    if os.environ.get('TERM') and '256' in os.environ.get('TERM', ''):
+        # ANSI color codes for highlighting
+        bright_green = '\033[38;5;46m'  # Bright green
+        bright_yellow = '\033[38;5;226m'  # Bright yellow
+        bold = '\033[1m'
+        reset = '\033[0m'
+        
+        print(f"\n{bold}{bright_yellow}PNR Code: {bright_green}{pnr}{reset}")
+        print("   Use this code for payment and ticket pickup")
+    else:
+        # Fallback without colors
+        print(f"\nPNR Code: {pnr}")
+        print("   Use this code for payment and ticket pickup")
     
     # Price and Payment
     price = soup.select_one("#setTrainTotalPriceValue").get_text(strip=True)
@@ -677,7 +751,7 @@ def _show_result(soup: BeautifulSoup) -> None:
     print("\n" + "─" * 50)
     print("Next Steps:")
     print("   1. Complete payment using the PNR code")
-    print("   2. Collect your ticket at the station")
+    print("   2. Collect your ticket at the station or phone app")
     print("   3. Enjoy your journey!")
 
 
@@ -703,18 +777,19 @@ def _try_ocr_captcha(img_bytes: bytes, max_attempts: int = 3) -> Optional[str]:
             # Initialize OCR model
             model_path = str(Path(__file__).parent.parent / "thsr_ocr" / "thsr_prediction_model_250827.keras")
             if not os.path.exists(model_path):
-                print("   OCR model not found, falling back to manual input")
+                print("[ OCR model not found, falling back to manual input ]")
                 return None
             
-            print("   Loading OCR model...")
+            # print("Loading OCR model...")
             tester = CaptchaModelTester(model_path)
             
             for attempt in range(max_attempts):
                 try:
                     if attempt == 0:
-                        print("   Recognizing captcha...")
+                        # print("Recognizing captcha...")
+                        pass
                     else:
-                        print(f"   Retry attempt {attempt + 1}/{max_attempts}...")
+                        print(f"[ Retry attempt {attempt + 1}/{max_attempts} ]")
                     
                     # Process image using the same processor as training  
                     # Suppress image processing output for cleaner CLI
@@ -738,10 +813,10 @@ def _try_ocr_captcha(img_bytes: bytes, max_attempts: int = 3) -> Optional[str]:
                         prediction = tester.predict_image(processed_path)
                         
                         if prediction and len(prediction.strip()) >= 3:  # Basic validation
-                            print(f"   ✓ OCR success: {prediction}")
+                            print(f"✓ OCR success: [{prediction}]")
                             return prediction.strip()
                         else:
-                            print(f"   ✗ OCR failed, result too short: '{prediction}'")
+                            print(f"✗ OCR failed, result too short: [{prediction}]")
                     
                     finally:
                         # Clean up processed image
@@ -751,9 +826,9 @@ def _try_ocr_captcha(img_bytes: bytes, max_attempts: int = 3) -> Optional[str]:
                             pass
                             
                 except Exception as e:
-                    print(f"   ✗ OCR attempt {attempt + 1} failed: {e}")
+                    print(f"✗ OCR attempt {attempt + 1} failed: {e}")
                     if attempt == max_attempts - 1:
-                        print("   ✗ All OCR attempts failed, fallback to manual input")
+                        print("✗ All OCR attempts failed, fallback to manual input")
             
             return None
             
@@ -778,5 +853,5 @@ def _show_image(img_bytes: bytes) -> None:
     with open(file_name, "wb") as f:
         f.write(img_bytes)
     
-    print(f"\nSecurity Verification Required")
-    print(f"   Captcha image saved to: {file_name}")
+    print(f"\n[ Security Verification Required ]")
+    print(f"Captcha image saved to: {file_name}")

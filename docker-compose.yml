@@ -3,8 +3,8 @@ services:
     build: .
     image: seanchangx/thsr-sniper:latest
     container_name: thsr-sniper
-    volumes:
-      - ./tmp:/tmp/
+    # volumes:
+    #   - ./tmp:/tmp/
     environment:
       - PYTHONUNBUFFERED=1
       - DISPLAY=${DISPLAY:-:0}

@@ -26,7 +26,7 @@ def _get_colored_banner() -> str:
 {thsr_red}║                    Taiwan High Speed Rail Ticket Sniper                      ║{reset}
 {thsr_red}║                                                                              ║{reset}
 {thsr_red}║    A modern CLI tool for booking THSR tickets with intelligent automation.   ║{reset}
-{thsr_red}║    Run without flags for interactive mode, or specify parameters directly.   ║{reset}
+{thsr_red}║    Features automatic captcha recognition and comprehensive booking flow.    ║{reset}
 {thsr_red}║                                                                              ║{reset}
 {thsr_red}╚══════════════════════════════════════════════════════════════════════════════╝{reset}
         """
@@ -44,7 +44,7 @@ def _get_colored_banner() -> str:
 ║                    Taiwan High Speed Rail Ticket Sniper                      ║
 ║                                                                              ║
 ║    A modern CLI tool for booking THSR tickets with intelligent automation.   ║
-║    Run without flags for interactive mode, or specify parameters directly.   ║
+║    Features automatic captcha recognition and comprehensive booking flow.    ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
         """
