@@ -10,7 +10,7 @@ on:
       release_notes:
         description: 'Release notes'
         required: false
-        default: 'Automated release build'
+        default: 'Automated release build.'
 
 permissions:
   contents: write
@@ -52,42 +52,6 @@ jobs:
           name: thsr-sniper-macos-apple-silicon
           path: dist/thsr-sniper-macos-apple-silicon
 
-  build-macos-intel:
-    runs-on: macos-13
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
-          # Ensure NumPy 1.x compatibility
-          pip install "numpy>=1.24.0,<2.0.0" --upgrade
-
-      - name: Build executable
-        run: |
-          pyinstaller --onefile --name thsr-sniper-macos-intel \
-            --add-data "thsr_ocr:thsr_ocr" \
-            --hidden-import=tensorflow \
-            --hidden-import=numpy.core._multiarray_umath \
-            --hidden-import=numpy.random._pickle \
-            --hidden-import=numpy.lib.format \
-            --collect-submodules=cv2 \
-            main.py
-
-      - name: Upload macOS Intel artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: thsr-sniper-macos-intel
-          path: dist/thsr-sniper-macos-intel
-
   build-windows:
     runs-on: windows-latest
     steps:
@@ -118,7 +82,7 @@ jobs:
           path: dist/thsr-sniper-windows.exe
 
   create-release:
-    needs: [build-macos-apple-silicon, build-macos-intel, build-windows]
+    needs: [build-macos-apple-silicon, build-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -164,13 +128,7 @@ jobs:
             ./thsr-sniper-macos-apple-silicon --help
             ```
             
-            ### 🍎 macOS (Intel)
-            **Native executable**
-            ```bash
-            # Download and run
-            chmod +x thsr-sniper-macos-intel
-            ./thsr-sniper-macos-intel --help
-            ```
+            > **Note**: For Intel Macs, please use Docker for best compatibility.
             
             ### 🪟 Windows
             **Native executable**
@@ -187,5 +145,4 @@ jobs:
             > **⚡ Recommendation**: Use Docker for the best experience across all platforms!
           files: |
             artifacts/thsr-sniper-macos-apple-silicon/thsr-sniper-macos-apple-silicon
-            artifacts/thsr-sniper-macos-intel/thsr-sniper-macos-intel
             artifacts/thsr-sniper-windows/thsr-sniper-windows.exe
