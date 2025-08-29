@@ -1,0 +1,170 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      release_notes:
+        description: 'Release notes'
+        required: false
+        default: 'Automated release build'
+
+jobs:
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-glx libglib2.0-0
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable
+        run: |
+          pyinstaller --onefile --name thsr-sniper-ubuntu main.py
+
+      - name: Upload Ubuntu artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: thsr-sniper-ubuntu
+          path: dist/thsr-sniper-ubuntu
+
+  build-macos-apple-silicon:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable
+        run: |
+          pyinstaller --onefile --name thsr-sniper-macos-apple-silicon main.py
+
+      - name: Upload macOS Apple Silicon artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: thsr-sniper-macos-apple-silicon
+          path: dist/thsr-sniper-macos-apple-silicon
+
+  build-macos-intel:
+    runs-on: macos-13
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable
+        run: |
+          pyinstaller --onefile --name thsr-sniper-macos-intel main.py
+
+      - name: Upload macOS Intel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: thsr-sniper-macos-intel
+          path: dist/thsr-sniper-macos-intel
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable
+        run: |
+          pyinstaller --onefile --name thsr-sniper-windows.exe main.py
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: thsr-sniper-windows
+          path: dist/thsr-sniper-windows.exe
+
+  create-release:
+    needs: [build-ubuntu, build-macos-apple-silicon, build-macos-intel, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: Release ${{ github.event.inputs.version }}
+          body: |
+            ${{ github.event.inputs.release_notes }}
+            
+            ## Downloads
+            
+            ### Ubuntu 22.04
+            - `thsr-sniper-ubuntu` - Linux executable
+            
+            ### macOS (Apple Silicon)
+            - `thsr-sniper-macos-apple-silicon` - macOS ARM64 executable
+            
+            ### macOS (Intel)
+            - `thsr-sniper-macos-intel` - macOS Intel executable
+            
+            ### Windows
+            - `thsr-sniper-windows.exe` - Windows executable
+            
+            ## Build Information
+            - Built on: ${{ github.event.inputs.version }}
+            - Build date: ${{ github.event.created_at }}
+          files: |
+            artifacts/thsr-sniper-ubuntu/thsr-sniper-ubuntu
+            artifacts/thsr-sniper-macos-apple-silicon/thsr-sniper-macos-apple-silicon
+            artifacts/thsr-sniper-macos-intel/thsr-sniper-macos-intel
+            artifacts/thsr-sniper-windows/thsr-sniper-windows.exe
