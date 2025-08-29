@@ -849,7 +849,10 @@ def _try_ocr_captcha(img_bytes: bytes, max_attempts: int = 3) -> Optional[str]:
 
 def _show_image(img_bytes: bytes) -> None:
     """Save and display captcha image information."""
-    file_name = "/tmp/tmp_code.jpg"
+    # Use platform-independent temporary directory
+    temp_dir = tempfile.gettempdir()
+    file_name = os.path.join(temp_dir, "thsr_captcha.jpg")
+    
     with open(file_name, "wb") as f:
         f.write(img_bytes)
     
