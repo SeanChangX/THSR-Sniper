@@ -764,7 +764,15 @@ def _try_ocr_captcha(img_bytes: bytes, max_attempts: int = 3) -> Optional[str]:
         logging.getLogger('tensorflow').setLevel(logging.ERROR)
         
         # Try to import OCR dependencies
-        sys.path.append(str(Path(__file__).parent.parent / "thsr_ocr"))
+        # Handle both development and PyInstaller bundled environments
+        if getattr(sys, 'frozen', False):
+            # Running in PyInstaller bundle
+            bundle_dir = Path(sys._MEIPASS)
+            sys.path.append(str(bundle_dir / "thsr_ocr"))
+        else:
+            # Running in development
+            sys.path.append(str(Path(__file__).parent.parent / "thsr_ocr"))
+        
         from test_model import CaptchaModelTester
         from datasets.image_processor import process_image
         
@@ -775,7 +783,14 @@ def _try_ocr_captcha(img_bytes: bytes, max_attempts: int = 3) -> Optional[str]:
         
         try:
             # Initialize OCR model
-            model_path = str(Path(__file__).parent.parent / "thsr_ocr" / "thsr_prediction_model_250827.keras")
+            # Handle both development and PyInstaller bundled environments
+            if getattr(sys, 'frozen', False):
+                # Running in PyInstaller bundle
+                bundle_dir = Path(sys._MEIPASS)
+                model_path = str(bundle_dir / "thsr_ocr" / "thsr_prediction_model_250827.keras")
+            else:
+                # Running in development
+                model_path = str(Path(__file__).parent.parent / "thsr_ocr" / "thsr_prediction_model_250827.keras")
             if not os.path.exists(model_path):
                 print("[ OCR model not found, falling back to manual input ]")
                 return None

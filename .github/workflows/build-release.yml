@@ -13,32 +13,19 @@ on:
         default: 'Automated release build'
 
 jobs:
-  build-ubuntu:
-    runs-on: ubuntu-20.04
+  trigger-docker-build:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Trigger Docker CI workflow
+        uses: actions/github-script@v7
         with:
-          python-version: '3.11'
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: Build executable
-        run: |
-          pyinstaller --onefile --name thsr-sniper-ubuntu main.py
-
-      - name: Upload Ubuntu artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: thsr-sniper-ubuntu
-          path: dist/thsr-sniper-ubuntu
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'docker-image.yml'
+            });
+            console.log('Docker CI workflow triggered successfully');
 
   build-macos-apple-silicon:
     runs-on: macos-latest
@@ -59,7 +46,11 @@ jobs:
 
       - name: Build executable
         run: |
-          pyinstaller --onefile --name thsr-sniper-macos-apple-silicon main.py
+          pyinstaller --onefile --name thsr-sniper-macos-apple-silicon \
+            --add-data "thsr_ocr:thsr_ocr" \
+            --hidden-import=tensorflow \
+            --hidden-import=keras \
+            main.py
 
       - name: Upload macOS Apple Silicon artifact
         uses: actions/upload-artifact@v4
@@ -86,7 +77,11 @@ jobs:
 
       - name: Build executable
         run: |
-          pyinstaller --onefile --name thsr-sniper-macos-intel main.py
+          pyinstaller --onefile --name thsr-sniper-macos-intel \
+            --add-data "thsr_ocr:thsr_ocr" \
+            --hidden-import=tensorflow \
+            --hidden-import=keras \
+            main.py
 
       - name: Upload macOS Intel artifact
         uses: actions/upload-artifact@v4
@@ -113,7 +108,11 @@ jobs:
 
       - name: Build executable
         run: |
-          pyinstaller --onefile --name thsr-sniper-windows.exe main.py
+          pyinstaller --onefile --name thsr-sniper-windows.exe ^
+            --add-data "thsr_ocr;thsr_ocr" ^
+            --hidden-import=tensorflow ^
+            --hidden-import=keras ^
+            main.py
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
@@ -122,7 +121,7 @@ jobs:
           path: dist/thsr-sniper-windows.exe
 
   create-release:
-    needs: [build-ubuntu, build-macos-apple-silicon, build-macos-intel, build-windows]
+    needs: [trigger-docker-build, build-macos-apple-silicon, build-macos-intel, build-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -141,25 +140,46 @@ jobs:
           body: |
             ${{ github.event.inputs.release_notes }}
             
-            ## Downloads
+            ## Platform Downloads & Usage
             
-            ### Ubuntu 22.04
-            - `thsr-sniper-ubuntu` - Linux executable
+            ### 🐧 Linux / Ubuntu
+            **Use Docker** (Recommended)
+            ```bash
+            # Pull and run the latest Docker image
+            docker run -it --rm ${{ secrets.DOCKERHUB_USERNAME }}/thsr-sniper:latest
             
-            ### macOS (Apple Silicon)
-            - `thsr-sniper-macos-apple-silicon` - macOS ARM64 executable
+            # Or with custom arguments
+            docker run -it --rm ${{ secrets.DOCKERHUB_USERNAME }}/thsr-sniper:latest python main.py --help
+            ```
             
-            ### macOS (Intel)
-            - `thsr-sniper-macos-intel` - macOS Intel executable
+            ### 🍎 macOS (Apple Silicon / M1/M2/M3)
+            **Native executable**
+            ```bash
+            # Download and run
+            chmod +x thsr-sniper-macos-apple-silicon
+            ./thsr-sniper-macos-apple-silicon --help
+            ```
             
-            ### Windows
-            - `thsr-sniper-windows.exe` - Windows executable
+            ### 🍎 macOS (Intel)
+            **Native executable**
+            ```bash
+            # Download and run
+            chmod +x thsr-sniper-macos-intel
+            ./thsr-sniper-macos-intel --help
+            ```
+            
+            ### 🪟 Windows
+            **Native executable**
+            ```cmd
+            # Download and run
+            thsr-sniper-windows.exe --help
+            ```
             
             ## Build Information
-            - Built on: ${{ github.event.inputs.version }}
-            - Build date: ${{ github.event.created_at }}
+            - Version: ${{ github.event.inputs.version }}
+            - Build date: ${{ github.run_started_at }}
+            - Docker image: Available on Docker Hub
           files: |
-            artifacts/thsr-sniper-ubuntu/thsr-sniper-ubuntu
             artifacts/thsr-sniper-macos-apple-silicon/thsr-sniper-macos-apple-silicon
             artifacts/thsr-sniper-macos-intel/thsr-sniper-macos-intel
             artifacts/thsr-sniper-windows/thsr-sniper-windows.exe
