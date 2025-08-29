@@ -32,6 +32,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
+          # Ensure NumPy 1.x compatibility
+          pip install "numpy>=1.21.0,<2.0.0" --upgrade
 
       - name: Build executable
         run: |
@@ -41,6 +43,8 @@ jobs:
             --hidden-import=keras \
             --hidden-import=numpy.core._multiarray_umath \
             --hidden-import=numpy.random._pickle \
+            --hidden-import=numpy.lib.format \
+            --collect-submodules=cv2 \
             main.py
 
       - name: Upload macOS Apple Silicon artifact
@@ -65,6 +69,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
+          # Ensure NumPy 1.x compatibility
+          pip install "numpy>=1.21.0,<2.0.0" --upgrade
 
       - name: Build executable
         run: |
@@ -74,6 +80,8 @@ jobs:
             --hidden-import=keras \
             --hidden-import=numpy.core._multiarray_umath \
             --hidden-import=numpy.random._pickle \
+            --hidden-import=numpy.lib.format \
+            --collect-submodules=cv2 \
             main.py
 
       - name: Upload macOS Intel artifact
@@ -98,10 +106,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
+          # Ensure NumPy 1.x compatibility
+          pip install "numpy>=1.21.0,<2.0.0" --upgrade
 
       - name: Build executable
         run: |
-          pyinstaller --onefile --name thsr-sniper-windows.exe --add-data "thsr_ocr;thsr_ocr" --hidden-import=tensorflow --hidden-import=keras --hidden-import=numpy.core._multiarray_umath --hidden-import=numpy.random._pickle main.py
+          pyinstaller --onefile --name thsr-sniper-windows.exe --add-data "thsr_ocr;thsr_ocr" --hidden-import=tensorflow --hidden-import=keras --hidden-import=numpy.core._multiarray_umath --hidden-import=numpy.random._pickle --hidden-import=numpy.lib.format --collect-submodules=cv2 main.py
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
