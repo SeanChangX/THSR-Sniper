@@ -148,7 +148,7 @@ jobs:
             
             ---
             
-            ### 🍎 macOS (Apple Silicon / M1/M2/M3)
+            ### 🍎 macOS (Apple Silicon)
             **Native executable**
             ```bash
             # Download and run
