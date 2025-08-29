@@ -13,20 +13,6 @@ on:
         default: 'Automated release build'
 
 jobs:
-  trigger-docker-build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger Docker CI workflow
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'docker-image.yml'
-            });
-            console.log('Docker CI workflow triggered successfully');
-
   build-macos-apple-silicon:
     runs-on: macos-latest
     steps:
@@ -108,11 +94,7 @@ jobs:
 
       - name: Build executable
         run: |
-          pyinstaller --onefile --name thsr-sniper-windows.exe ^
-            --add-data "thsr_ocr;thsr_ocr" ^
-            --hidden-import=tensorflow ^
-            --hidden-import=keras ^
-            main.py
+          pyinstaller --onefile --name thsr-sniper-windows.exe --add-data "thsr_ocr;thsr_ocr" --hidden-import=tensorflow --hidden-import=keras main.py
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
@@ -121,7 +103,7 @@ jobs:
           path: dist/thsr-sniper-windows.exe
 
   create-release:
-    needs: [trigger-docker-build, build-macos-apple-silicon, build-macos-intel, build-windows]
+    needs: [build-macos-apple-silicon, build-macos-intel, build-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -151,6 +133,8 @@ jobs:
             # Or with custom arguments
             docker run -it --rm ${{ secrets.DOCKERHUB_USERNAME }}/thsr-sniper:latest python main.py --help
             ```
+            
+            > **Note**: Docker image is built separately. Check [Docker Hub](${{ secrets.DOCKERHUB_USERNAME }}/thsr-sniper) for the latest image.
             
             ### 🍎 macOS (Apple Silicon / M1/M2/M3)
             **Native executable**
