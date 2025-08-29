@@ -12,6 +12,9 @@ on:
         required: false
         default: 'Automated release build'
 
+permissions:
+  contents: write
+
 jobs:
   build-macos-apple-silicon:
     runs-on: macos-latest
