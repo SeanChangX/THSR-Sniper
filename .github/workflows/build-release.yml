@@ -39,6 +39,8 @@ jobs:
             --add-data "thsr_ocr:thsr_ocr" \
             --hidden-import=tensorflow \
             --hidden-import=keras \
+            --hidden-import=numpy.core._multiarray_umath \
+            --hidden-import=numpy.random._pickle \
             main.py
 
       - name: Upload macOS Apple Silicon artifact
@@ -70,6 +72,8 @@ jobs:
             --add-data "thsr_ocr:thsr_ocr" \
             --hidden-import=tensorflow \
             --hidden-import=keras \
+            --hidden-import=numpy.core._multiarray_umath \
+            --hidden-import=numpy.random._pickle \
             main.py
 
       - name: Upload macOS Intel artifact
@@ -97,7 +101,7 @@ jobs:
 
       - name: Build executable
         run: |
-          pyinstaller --onefile --name thsr-sniper-windows.exe --add-data "thsr_ocr;thsr_ocr" --hidden-import=tensorflow --hidden-import=keras main.py
+          pyinstaller --onefile --name thsr-sniper-windows.exe --add-data "thsr_ocr;thsr_ocr" --hidden-import=tensorflow --hidden-import=keras --hidden-import=numpy.core._multiarray_umath --hidden-import=numpy.random._pickle main.py
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
@@ -112,6 +116,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set build date
+        run: echo "BUILD_DATE=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_ENV
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -121,14 +128,14 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.event.inputs.version }}
-          name: Release ${{ github.event.inputs.version }}
+          name: ${{ github.event.inputs.version }}
           body: |
             ${{ github.event.inputs.release_notes }}
             
             ## Platform Downloads & Usage
             
-            ### 🐧 Linux / Ubuntu
-            **Use Docker** (Recommended)
+            ### 🐳 Docker (⭐ **RECOMMENDED** for all platforms)
+            **Best compatibility and performance**
             ```bash
             # Pull and run the latest Docker image
             docker run -it --rm ${{ secrets.DOCKERHUB_USERNAME }}/thsr-sniper:latest
@@ -137,7 +144,9 @@ jobs:
             docker run -it --rm ${{ secrets.DOCKERHUB_USERNAME }}/thsr-sniper:latest python main.py --help
             ```
             
-            > **Note**: Docker image is built separately. Check [Docker Hub](${{ secrets.DOCKERHUB_USERNAME }}/thsr-sniper) for the latest image.
+            > **Note**: Docker image is built separately. Check [Docker Hub](https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/thsr-sniper/tags) for the latest image.
+            
+            ---
             
             ### 🍎 macOS (Apple Silicon / M1/M2/M3)
             **Native executable**
@@ -164,8 +173,10 @@ jobs:
             
             ## Build Information
             - Version: ${{ github.event.inputs.version }}
-            - Build date: ${{ github.run_started_at }}
+            - Build date: ${{ env.BUILD_DATE }}
             - Docker image: Available on Docker Hub
+            
+            > **⚡ Recommendation**: Use Docker for the best experience across all platforms!
           files: |
             artifacts/thsr-sniper-macos-apple-silicon/thsr-sniper-macos-apple-silicon
             artifacts/thsr-sniper-macos-intel/thsr-sniper-macos-intel
