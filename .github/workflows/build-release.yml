@@ -25,7 +25,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Install Python dependencies
         run: |
@@ -33,14 +33,13 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
           # Ensure NumPy 1.x compatibility
-          pip install "numpy>=1.21.0,<2.0.0" --upgrade
+          pip install "numpy>=1.24.0,<2.0.0" --upgrade
 
       - name: Build executable
         run: |
           pyinstaller --onefile --name thsr-sniper-macos-apple-silicon \
             --add-data "thsr_ocr:thsr_ocr" \
             --hidden-import=tensorflow \
-            --hidden-import=keras \
             --hidden-import=numpy.core._multiarray_umath \
             --hidden-import=numpy.random._pickle \
             --hidden-import=numpy.lib.format \
@@ -62,7 +61,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Install Python dependencies
         run: |
@@ -70,14 +69,13 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
           # Ensure NumPy 1.x compatibility
-          pip install "numpy>=1.21.0,<2.0.0" --upgrade
+          pip install "numpy>=1.24.0,<2.0.0" --upgrade
 
       - name: Build executable
         run: |
           pyinstaller --onefile --name thsr-sniper-macos-intel \
             --add-data "thsr_ocr:thsr_ocr" \
             --hidden-import=tensorflow \
-            --hidden-import=keras \
             --hidden-import=numpy.core._multiarray_umath \
             --hidden-import=numpy.random._pickle \
             --hidden-import=numpy.lib.format \
@@ -99,7 +97,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Install Python dependencies
         run: |
@@ -107,11 +105,11 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
           # Ensure NumPy 1.x compatibility
-          pip install "numpy>=1.21.0,<2.0.0" --upgrade
+          pip install "numpy>=1.24.0,<2.0.0" --upgrade
 
       - name: Build executable
         run: |
-          pyinstaller --onefile --name thsr-sniper-windows.exe --add-data "thsr_ocr;thsr_ocr" --hidden-import=tensorflow --hidden-import=keras --hidden-import=numpy.core._multiarray_umath --hidden-import=numpy.random._pickle --hidden-import=numpy.lib.format --collect-submodules=cv2 main.py
+          pyinstaller --onefile --name thsr-sniper-windows.exe --add-data "thsr_ocr;thsr_ocr" --hidden-import=tensorflow  --hidden-import=numpy.core._multiarray_umath --hidden-import=numpy.random._pickle --hidden-import=numpy.lib.format --collect-submodules=cv2 main.py
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
