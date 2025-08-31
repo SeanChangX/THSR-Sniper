@@ -1,0 +1,148 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      release_notes:
+        description: 'Release notes'
+        required: false
+        default: 'Automated release build.'
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos-apple-silicon:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          # Ensure NumPy 1.x compatibility
+          pip install "numpy>=1.24.0,<2.0.0" --upgrade
+
+      - name: Build executable
+        run: |
+          pyinstaller --onefile --name thsr-sniper-macos-apple-silicon \
+            --add-data "thsr_ocr:thsr_ocr" \
+            --hidden-import=tensorflow \
+            --hidden-import=numpy.core._multiarray_umath \
+            --hidden-import=numpy.random._pickle \
+            --hidden-import=numpy.lib.format \
+            --collect-submodules=cv2 \
+            main.py
+
+      - name: Upload macOS Apple Silicon artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: thsr-sniper-macos-apple-silicon
+          path: dist/thsr-sniper-macos-apple-silicon
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          # Ensure NumPy 1.x compatibility
+          pip install "numpy>=1.24.0,<2.0.0" --upgrade
+
+      - name: Build executable
+        run: |
+          pyinstaller --onefile --name thsr-sniper-windows.exe --add-data "thsr_ocr;thsr_ocr" --hidden-import=tensorflow  --hidden-import=numpy.core._multiarray_umath --hidden-import=numpy.random._pickle --hidden-import=numpy.lib.format --collect-submodules=cv2 main.py
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: thsr-sniper-windows
+          path: dist/thsr-sniper-windows.exe
+
+  create-release:
+    needs: [build-macos-apple-silicon, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set build date
+        run: echo "BUILD_DATE=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_ENV
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: ${{ github.event.inputs.version }}
+          body: |
+            ${{ github.event.inputs.release_notes }}
+            
+            ## Platform Downloads & Usage
+            
+            ### 🐳 Docker (⭐ **RECOMMENDED** for all platforms)
+            **Best compatibility and performance**
+            ```bash
+            # Pull and run the latest Docker image
+            docker run -it --rm ${{ secrets.DOCKERHUB_USERNAME }}/thsr-sniper:latest
+            
+            # Or with custom arguments
+            docker run -it --rm ${{ secrets.DOCKERHUB_USERNAME }}/thsr-sniper:latest python main.py --help
+            ```
+            
+            > **Note**: Docker image is built separately. Check [Docker Hub](https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/thsr-sniper/tags) for the latest image.
+            
+            ---
+            
+            ### 🍎 macOS (Apple Silicon)
+            **Native executable**
+            ```bash
+            # Download and run
+            chmod +x thsr-sniper-macos-apple-silicon
+            ./thsr-sniper-macos-apple-silicon --help
+            ```
+            
+            > **Note**: For Intel Macs, please use Docker for best compatibility.
+            
+            ### 🪟 Windows
+            **Native executable**
+            ```cmd
+            # Download and run
+            thsr-sniper-windows.exe --help
+            ```
+            
+            ## Build Information
+            - Version: ${{ github.event.inputs.version }}
+            - Build date: ${{ env.BUILD_DATE }}
+            - Docker image: Available on Docker Hub
+            
+            > **⚡ Recommendation**: Use Docker for the best experience across all platforms!
+          files: |
+            artifacts/thsr-sniper-macos-apple-silicon/thsr-sniper-macos-apple-silicon
+            artifacts/thsr-sniper-windows/thsr-sniper-windows.exe
