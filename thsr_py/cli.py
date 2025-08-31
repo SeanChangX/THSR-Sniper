@@ -62,17 +62,32 @@ Examples:
   # Interactive mode
   python main.py
 
-  # Quick booking
+  # Quick booking (immediate)
   python main.py --from 2 --to 11 --adult 1 --date 2026/01/01
+
+  # Scheduled booking (requires API server running)
+  python main.py --schedule --from 2 --to 11 --adult 1 --date +1 \
+                 --id A123456789 --member n --interval 5
+
+  # Task management (requires API server running)
+  python main.py --list-tasks
+  python main.py --task-status TASK_ID
+  python main.py --cancel-task TASK_ID
 
   # View options
   python main.py --stations
   python main.py --times
 
+  # Start API server
+  python main.py --start-api --api-port 8000
+
   # Advanced booking
   python main.py --from 1 --to 12 --date 2026/01/01 --time 10
                  --adult 1 --seat 1 --class 0 --train 1
                  --id A123456789 --member n
+
+  # Watchdog service (standalone)
+  python watchdog.py
         """
     )
 
@@ -149,6 +164,62 @@ Examples:
         type=int,
         choices=[0, 1],
         help="Class type: 0=standard, 1=business"
+    )
+
+    # Scheduler options (via API)
+    scheduler_group = parser.add_argument_group("Scheduler Options")
+    scheduler_group.add_argument(
+        "--schedule",
+        action="store_true",
+        help="Schedule booking for periodic execution (via API)"
+    )
+    scheduler_group.add_argument(
+        "--interval",
+        type=int,
+        default=5,
+        help="Booking attempt interval in minutes (default: 5)"
+    )
+    scheduler_group.add_argument(
+        "--max-attempts",
+        dest="max_attempts",
+        type=int,
+        help="Maximum number of booking attempts (unlimited if not specified)"
+    )
+    scheduler_group.add_argument(
+        "--list-tasks",
+        action="store_true",
+        help="List all scheduled booking tasks (via API)"
+    )
+    scheduler_group.add_argument(
+        "--task-status",
+        dest="task_status",
+        help="Show status of a specific task by ID (via API)"
+    )
+    scheduler_group.add_argument(
+        "--cancel-task",
+        dest="cancel_task",
+        help="Cancel a scheduled task by ID (via API)"
+    )
+
+    # API Server options
+    api_group = parser.add_argument_group("API Server Options")
+    api_group.add_argument(
+        "--start-api",
+        action="store_true",
+        help="Start the API server for web interface and task scheduling"
+    )
+    api_group.add_argument(
+        "--api-host",
+        dest="api_host",
+        default="0.0.0.0",
+        help="API server host (default: 0.0.0.0)"
+    )
+    api_group.add_argument(
+        "--api-port",
+        dest="api_port",
+        type=int,
+        default=8000,
+        help="API server port (default: 8000)"
     )
 
     # Information and utilities

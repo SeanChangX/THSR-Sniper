@@ -106,6 +106,22 @@ def _headers() -> Dict[str, str]:
 
 def _get_input(prompt: str, default, choices: Optional[List] = None) -> any:
     """Get user input with modern formatting and validation."""
+    import sys
+    import os
+    
+    # Check if running in non-interactive mode (API calls or scheduled tasks)
+    # Environment variable THSR_NON_INTERACTIVE can be set to force non-interactive mode
+    is_non_interactive = (
+        os.environ.get('THSR_NON_INTERACTIVE') == '1' or
+        os.environ.get('THSR_API_MODE') == '1' or
+        (not sys.stdin.isatty() and os.environ.get('THSR_FORCE_INTERACTIVE') != '1')
+    )
+    
+    if is_non_interactive:
+        print(f"\nAuto-selecting default for: {prompt}")
+        print(f"Using default value: {default}")
+        return default
+    
     if choices:
         print(f"\n{prompt}")
         # print(f"Available options: {', '.join(map(str, choices))}")
@@ -117,8 +133,9 @@ def _get_input(prompt: str, default, choices: Optional[List] = None) -> any:
     
     try:
         val = input("> ").strip()
-    except EOFError:
-        val = ""
+    except (EOFError, OSError):
+        print(f"No input available, using default: {default}")
+        return default
     
     if val == "":
         return default
@@ -484,9 +501,26 @@ class _BookingPayload:
                 return
         
         # Fallback to manual input
-        print("\nEnter the security code from the captcha image:")
-        code = input("> ").strip()
-        self.security_code = code
+        import sys
+        import os
+        
+        is_non_interactive = (
+            os.environ.get('THSR_NON_INTERACTIVE') == '1' or
+            os.environ.get('THSR_API_MODE') == '1' or
+            (not sys.stdin.isatty() and os.environ.get('THSR_FORCE_INTERACTIVE') != '1')
+        )
+        
+        if is_non_interactive:
+            print("\nNo stdin available for captcha input, using empty string")
+            self.security_code = ""
+        else:
+            print("\nEnter the security code from the captcha image:")
+            try:
+                code = input("> ").strip()
+                self.security_code = code
+            except (EOFError, OSError):
+                print("No input available, using empty captcha code")
+                self.security_code = ""
 
 
 def _confirm_train_flow(session: requests.Session, soup: BeautifulSoup, train_index: Optional[int] = None) -> Optional[BeautifulSoup]:
@@ -629,8 +663,25 @@ class _ConfirmTicketPayload:
 
     def input_personal_id(self, personal_id: Optional[str]) -> str:
         if personal_id is None:
-            print("\nEnter your personal ID number:")
-            personal_id = input("> ").strip()
+            import sys
+            import os
+            
+            is_non_interactive = (
+                os.environ.get('THSR_NON_INTERACTIVE') == '1' or
+                os.environ.get('THSR_API_MODE') == '1' or
+                (not sys.stdin.isatty() and os.environ.get('THSR_FORCE_INTERACTIVE') != '1')
+            )
+            
+            if is_non_interactive:
+                print("\nNo stdin available, using empty personal ID")
+                personal_id = ""
+            else:
+                print("\nEnter your personal ID number:")
+                try:
+                    personal_id = input("> ").strip()
+                except (EOFError, OSError):
+                    print("No input available, using empty personal ID")
+                    personal_id = ""
         self.personal_id = personal_id.strip()
         return self.personal_id
 
