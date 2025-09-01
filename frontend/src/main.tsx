@@ -11,8 +11,19 @@ import 'react-toastify/dist/ReactToastify.css'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: (failureCount, error) => {
+        // Don't retry on 4xx errors (client errors)
+        if (error?.response?.status >= 400 && error?.response?.status < 500) {
+          return false;
+        }
+        // Only retry once for server errors
+        return failureCount < 1;
+      },
       staleTime: 5 * 60 * 1000, // 5 minutes
+      onError: (error: any) => {
+        // Only show toast for final error after all retries
+        console.error('Query error:', error);
+      }
     },
   },
 })

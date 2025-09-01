@@ -13,7 +13,7 @@ const Dashboard: React.FC = () => {
   const { data: schedulerStatus, isLoading: statusLoading } = useQuery(
     'schedulerStatus',
     thsrApi.getSchedulerStatus,
-    { refetchInterval: 5000 }
+    { refetchInterval: 600000 } // 10 minutes
   );
 
   const { data: stats, isLoading: statsLoading } = useQuery(

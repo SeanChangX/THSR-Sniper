@@ -148,6 +148,10 @@ addAuthInterceptor(authClient);
 addResponseInterceptor(apiClient);
 addResponseInterceptor(authClient);
 
+// Error deduplication cache
+let lastErrorTime = 0;
+let lastErrorMessage = '';
+
 // Error handler
 const handleApiError = (error: any, showToast = true) => {
   const message = error.response?.data?.detail || 
@@ -158,8 +162,14 @@ const handleApiError = (error: any, showToast = true) => {
   // Don't show toast for authentication errors that are expected
   const shouldShowToast = showToast && !(error.response?.status === 401 || error.response?.status === 403);
   
-  if (shouldShowToast) {
+  // Deduplicate identical error messages within 1 second
+  const now = Date.now();
+  const isDuplicate = lastErrorMessage === message && (now - lastErrorTime) < 1000;
+  
+  if (shouldShowToast && !isDuplicate) {
     toast.error(message);
+    lastErrorTime = now;
+    lastErrorMessage = message;
   }
   
   throw new Error(message);
