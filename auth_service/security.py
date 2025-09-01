@@ -136,7 +136,7 @@ def validate_password_strength(password: str) -> tuple[bool, str]:
     if not any(c.isdigit() for c in password):
         return False, "Password must contain at least one number"
     
-    special_chars = "!@#$%^&*()_+-=[]{}|;:,.<>?"
+    special_chars = "!@#$%^&*()_+-=[]{}|;:,.<>?\"'`~/"
     if not any(c in special_chars for c in password):
         return False, "Password must contain at least one special character"
     
