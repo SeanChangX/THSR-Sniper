@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Dict, List, Optional, Any
 import logging
@@ -32,6 +32,9 @@ class BookingTask:
     date: str
     adult_cnt: Optional[int] = None
     student_cnt: Optional[int] = None
+    child_cnt: Optional[int] = None
+    senior_cnt: Optional[int] = None
+    disabled_cnt: Optional[int] = None
     time: Optional[int] = None
     train_index: Optional[int] = None
     seat_prefer: Optional[int] = None
@@ -46,7 +49,7 @@ class BookingTask:
     
     # Status tracking
     status: BookingStatus = BookingStatus.PENDING
-    created_at: datetime = field(default_factory=datetime.now)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     last_attempt: Optional[datetime] = None
     attempts: int = 0
     success_pnr: Optional[str] = None
@@ -56,7 +59,7 @@ class BookingTask:
         """Check if the booking date has passed."""
         try:
             booking_date = datetime.strptime(self.date, "%Y/%m/%d")
-            return datetime.now().date() > booking_date.date()
+            return datetime.now(timezone.utc).date() > booking_date.date()
         except ValueError:
             return False
     
@@ -97,6 +100,9 @@ class BookingTask:
             "date": self.date,
             "adult_cnt": self.adult_cnt,
             "student_cnt": self.student_cnt,
+            "child_cnt": self.child_cnt,
+            "senior_cnt": self.senior_cnt,
+            "disabled_cnt": self.disabled_cnt,
             "time": self.time,
             "train_index": self.train_index,
             "seat_prefer": self.seat_prefer,
@@ -107,8 +113,8 @@ class BookingTask:
             "interval_minutes": self.interval_minutes,
             "max_attempts": self.max_attempts,
             "status": self.status.value,
-            "created_at": self.created_at.isoformat(),
-            "last_attempt": self.last_attempt.isoformat() if self.last_attempt else None,
+            "created_at": self.created_at.isoformat().replace('+00:00', 'Z'),
+            "last_attempt": self.last_attempt.isoformat().replace('+00:00', 'Z') if self.last_attempt else None,
             "attempts": self.attempts,
             "success_pnr": self.success_pnr,
             "error_message": self.error_message
@@ -124,6 +130,9 @@ class BookingTask:
             date=data["date"],
             adult_cnt=data.get("adult_cnt"),
             student_cnt=data.get("student_cnt"),
+            child_cnt=data.get("child_cnt"),
+            senior_cnt=data.get("senior_cnt"),
+            disabled_cnt=data.get("disabled_cnt"),
             time=data.get("time"),
             train_index=data.get("train_index"),
             seat_prefer=data.get("seat_prefer"),
@@ -140,9 +149,23 @@ class BookingTask:
         )
         
         if data.get("created_at"):
-            task.created_at = datetime.fromisoformat(data["created_at"])
+            created_at_str = data["created_at"]
+            # Handle both Z format and raw format (assume UTC if no timezone)
+            if created_at_str.endswith('Z'):
+                created_at_str = created_at_str.replace('Z', '+00:00')
+            elif '+' not in created_at_str and 'Z' not in created_at_str:
+                # No timezone info, assume it's already UTC
+                created_at_str += '+00:00'
+            task.created_at = datetime.fromisoformat(created_at_str)
         if data.get("last_attempt"):
-            task.last_attempt = datetime.fromisoformat(data["last_attempt"])
+            last_attempt_str = data["last_attempt"]
+            # Handle both Z format and raw format (assume UTC if no timezone)
+            if last_attempt_str.endswith('Z'):
+                last_attempt_str = last_attempt_str.replace('Z', '+00:00')
+            elif '+' not in last_attempt_str and 'Z' not in last_attempt_str:
+                # No timezone info, assume it's already UTC
+                last_attempt_str += '+00:00'
+            task.last_attempt = datetime.fromisoformat(last_attempt_str)
             
         return task
 
@@ -241,7 +264,7 @@ class BookingScheduler:
             
             data = {
                 "tasks": [task.to_dict() for task in self.tasks.values()],
-                "last_updated": datetime.now().isoformat()
+                "last_updated": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
             }
             
             # Write to temporary file first, then move to final location (atomic write)
@@ -334,7 +357,7 @@ class BookingScheduler:
     
     def _process_tasks(self) -> None:
         """Process all pending tasks."""
-        current_time = datetime.now()
+        current_time = datetime.now(timezone.utc)
         
         for task in list(self.tasks.values()):
             if task.status in [BookingStatus.SUCCESS, BookingStatus.CANCELLED]:
@@ -374,7 +397,7 @@ class BookingScheduler:
         
         # Update task status and attempt info
         task.status = BookingStatus.RUNNING
-        task.last_attempt = datetime.now()
+        task.last_attempt = datetime.now(timezone.utc)
         task.attempts += 1
         
         self.logger.info(f"Executing task {task.id} (attempt {task.attempts})")
@@ -494,6 +517,9 @@ def create_booking_task(
     use_membership: bool,
     adult_cnt: Optional[int] = None,
     student_cnt: Optional[int] = None,
+    child_cnt: Optional[int] = None,
+    senior_cnt: Optional[int] = None,
+    disabled_cnt: Optional[int] = None,
     time: Optional[int] = None,
     train_index: Optional[int] = None,
     seat_prefer: Optional[int] = None,
@@ -524,7 +550,7 @@ def create_booking_task(
     # Validate date format and future date
     try:
         booking_date = datetime.strptime(date, "%Y/%m/%d")
-        if booking_date.date() < datetime.now().date():
+        if booking_date.date() < datetime.now(timezone.utc).date():
             raise ValueError(f"Booking date must be in the future: {date}")
     except ValueError as e:
         if "does not match format" in str(e):
@@ -532,12 +558,9 @@ def create_booking_task(
         raise e
     
     # Validate ticket counts - require at least one ticket
-    if adult_cnt is None and student_cnt is None:
-        raise ValueError("At least one ticket type (adult or student) must be specified")
-    
-    total_tickets = (adult_cnt or 0) + (student_cnt or 0)
+    total_tickets = (adult_cnt or 0) + (student_cnt or 0) + (child_cnt or 0) + (senior_cnt or 0) + (disabled_cnt or 0)
     if total_tickets == 0:
-        raise ValueError("Total ticket count must be greater than 0")
+        raise ValueError("At least one ticket must be specified")
     if total_tickets > 10:
         raise ValueError("Total ticket count cannot exceed 10")
     
@@ -545,6 +568,12 @@ def create_booking_task(
         raise ValueError(f"Adult ticket count must be 0-10: {adult_cnt}")
     if student_cnt is not None and not 0 <= student_cnt <= 10:
         raise ValueError(f"Student ticket count must be 0-10: {student_cnt}")
+    if child_cnt is not None and not 0 <= child_cnt <= 10:
+        raise ValueError(f"Child ticket count must be 0-10: {child_cnt}")
+    if senior_cnt is not None and not 0 <= senior_cnt <= 10:
+        raise ValueError(f"Senior ticket count must be 0-10: {senior_cnt}")
+    if disabled_cnt is not None and not 0 <= disabled_cnt <= 10:
+        raise ValueError(f"Disabled ticket count must be 0-10: {disabled_cnt}")
     
     # Validate optional parameters
     if time is not None and not 1 <= time <= len(TIME_TABLE):
@@ -579,6 +608,9 @@ def create_booking_task(
         use_membership=use_membership,
         adult_cnt=adult_cnt,
         student_cnt=student_cnt,
+        child_cnt=child_cnt,
+        senior_cnt=senior_cnt,
+        disabled_cnt=disabled_cnt,
         time=time,
         train_index=train_index,
         seat_prefer=seat_prefer,

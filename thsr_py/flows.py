@@ -90,9 +90,25 @@ def _print_section(title: str) -> None:
 
 
 def _headers() -> Dict[str, str]:
+    import random
+    import time
+    import uuid
+    
+    # Generate unique session-like identifiers for each request
+    session_id = f"{random.randint(100000, 999999)}_{int(time.time())}"
+    device_id = str(uuid.uuid4())[:8]
+    browser_version = f"137.{random.randint(0, 9)}"
+    
+    # Randomize some header values to simulate different users/devices
+    windows_versions = ["10.0", "11.0"]
+    firefox_versions = [f"137.{random.randint(0, 9)}", f"136.{random.randint(0, 9)}", f"138.{random.randint(0, 9)}"]
+    
+    selected_windows = random.choice(windows_versions)
+    selected_firefox = random.choice(firefox_versions)
+    
     return {
         "Host": "irs.thsrc.com.tw",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0",
+        "User-Agent": f"Mozilla/5.0 (Windows NT {selected_windows}; Win64; x64; rv:{selected_firefox}) Gecko/20100101 Firefox/{selected_firefox}",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
         "Accept-Language": "zh-TW,zh;q=0.8,en-US;q=0.5,en;q=0.3",
         "Accept-Encoding": "deflate, br",
@@ -101,6 +117,12 @@ def _headers() -> Dict[str, str]:
         "Referer": "https://irs.thsrc.com.tw/IMINT/",
         "Sec-Fetch-Site": "same-origin",
         "Sec-Fetch-Mode": "no-cors",
+        # Add session-like headers to make each request appear unique
+        "X-Requested-With": "XMLHttpRequest",
+        "X-Session-ID": session_id,
+        "X-Device-ID": device_id,
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
     }
 
 
@@ -260,22 +282,36 @@ def run(args) -> None:
     payload.select_time(getattr(args, "time", None))
 
     # Handle ticket selection logic properly
-    adult_cnt = getattr(args, "adult_cnt", None)
-    student_cnt = getattr(args, "student_cnt", None)
+    adult_cnt = getattr(args, "adult_cnt", None) or 0
+    student_cnt = getattr(args, "student_cnt", None) or 0
+    child_cnt = getattr(args, "child_cnt", None) or 0
+    senior_cnt = getattr(args, "senior_cnt", None) or 0
+    disabled_cnt = getattr(args, "disabled_cnt", None) or 0
     
-    if adult_cnt is None and student_cnt is None:
+    total_tickets = adult_cnt + student_cnt + child_cnt + senior_cnt + disabled_cnt
+    
+    if total_tickets == 0:
         # No tickets specified, default to 1 adult ticket
         payload.select_ticket_num(TicketType.Adult, None)
     else:
         # Tickets specified, use explicit counts
-        if adult_cnt is not None:
+        if adult_cnt > 0:
             payload.select_ticket_num(TicketType.Adult, adult_cnt)
-        elif student_cnt is not None:
-            # If only student tickets specified, set adult tickets to 0
+        elif total_tickets > 0:
+            # If no adult tickets but other types exist, explicitly set adult to 0
             payload.select_ticket_num(TicketType.Adult, 0)
         
-        if student_cnt is not None:
+        if student_cnt > 0:
             payload.select_ticket_num(TicketType.College, student_cnt)
+        
+        if child_cnt > 0:
+            payload.select_ticket_num(TicketType.Child, child_cnt)
+            
+        if senior_cnt > 0:
+            payload.select_ticket_num(TicketType.Elder, senior_cnt)
+            
+        if disabled_cnt > 0:
+            payload.select_ticket_num(TicketType.Disabled, disabled_cnt)
 
     payload.select_seat_prefer(getattr(args, "seat_prefer", None))
     payload.select_class_type(getattr(args, "class_type", None))

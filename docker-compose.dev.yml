@@ -39,6 +39,7 @@ services:
       - "8000:8000"
     volumes:
       - thsr_data:/app/data
+      - ./thsr_py:/app/thsr_py  # Mount source code for development
     environment:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
@@ -57,6 +58,7 @@ services:
       - "8001:8001"
     volumes:
       - thsr_data:/app/data
+      - ./auth_service:/app  # Mount source code for development
     environment:
       - PYTHONUNBUFFERED=1
       - SECRET_KEY=${SECRET_KEY}
@@ -72,16 +74,21 @@ services:
       retries: 3
       start_period: 40s
 
-  # React frontend
-  thsr-sniper-frontend:
-    build: ./frontend
-    image: seanchangx/thsr-sniper-frontend:latest
-    container_name: thsr-frontend
+  # Development React frontend with Vite hot reload
+  thsr-sniper-frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    image: seanchangx/thsr-sniper-frontend:dev
+    container_name: thsr-frontend-dev
     ports:
-      - "3000:80"
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     environment:
-      - VITE_API_URL=http://localhost:8000
-      - VITE_AUTH_URL=http://localhost:8001
+      - VITE_API_URL=/api
+      - VITE_AUTH_URL=/auth
     restart: unless-stopped
     networks:
       - thsr-network

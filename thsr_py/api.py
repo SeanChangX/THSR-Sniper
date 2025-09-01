@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import requests
 from datetime import datetime
 from typing import Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, model_validator
 import uvicorn
 
 from .scheduler import (
@@ -25,6 +26,9 @@ class BookingRequest(BaseModel):
     use_membership: bool = Field(..., description="Use THSR membership (required)")
     adult_cnt: Optional[int] = Field(None, ge=0, le=10, description="Number of adult tickets (0-10)")
     student_cnt: Optional[int] = Field(None, ge=0, le=10, description="Number of student tickets (0-10)")
+    child_cnt: Optional[int] = Field(None, ge=0, le=10, description="Number of child tickets (0-10)")
+    senior_cnt: Optional[int] = Field(None, ge=0, le=10, description="Number of senior tickets (0-10)")
+    disabled_cnt: Optional[int] = Field(None, ge=0, le=10, description="Number of disabled tickets (0-10)")
     time: Optional[int] = Field(None, ge=1, le=38, description="Departure time ID (1-38)")
     train_index: Optional[int] = Field(None, ge=1, description="Train selection index")
     seat_prefer: Optional[int] = Field(None, ge=0, le=2, description="Seat preference: 0=any, 1=window, 2=aisle")
@@ -50,16 +54,24 @@ class BookingRequest(BaseModel):
             raise ValueError("Personal ID must be 10 characters long")
         return v
     
-    @validator('student_cnt', always=True)
-    def validate_ticket_counts(cls, v, values):
-        # Ensure at least one ticket is selected
-        adult_cnt = values.get('adult_cnt', 0) or 0
-        student_cnt = v or 0
+    @model_validator(mode='after')
+    def validate_ticket_counts(self):
+        """Validate that at least one ticket is selected and total doesn't exceed 10"""
+        adult_cnt = self.adult_cnt or 0
+        student_cnt = self.student_cnt or 0
+        child_cnt = self.child_cnt or 0
+        senior_cnt = self.senior_cnt or 0
+        disabled_cnt = self.disabled_cnt or 0
         
-        if adult_cnt == 0 and student_cnt == 0:
-            raise ValueError("At least one ticket type (adult or student) must be specified")
+        total_tickets = adult_cnt + student_cnt + child_cnt + senior_cnt + disabled_cnt
         
-        return v
+        if total_tickets == 0:
+            raise ValueError("At least one ticket must be specified")
+        
+        if total_tickets > 10:
+            raise ValueError("Total tickets cannot exceed 10")
+        
+        return self
 
 
 class ScheduledBookingRequest(BookingRequest):
@@ -184,8 +196,11 @@ async def immediate_booking(request: BookingRequest):
             date=request.date,
             personal_id=request.personal_id,
             use_membership=request.use_membership,
-            adult_cnt=request.adult_cnt,
-            student_cnt=request.student_cnt,
+            adult_cnt=request.adult_cnt if request.adult_cnt is not None else 0,
+            student_cnt=request.student_cnt if request.student_cnt is not None else 0,
+            child_cnt=request.child_cnt if request.child_cnt is not None else 0,
+            senior_cnt=request.senior_cnt if request.senior_cnt is not None else 0,
+            disabled_cnt=request.disabled_cnt if request.disabled_cnt is not None else 0,
             time=request.time,
             train_index=request.train_index,
             seat_prefer=request.seat_prefer,
@@ -266,6 +281,9 @@ async def schedule_booking(request: ScheduledBookingRequest):
             use_membership=request.use_membership,
             adult_cnt=request.adult_cnt,
             student_cnt=request.student_cnt,
+            child_cnt=request.child_cnt,
+            senior_cnt=request.senior_cnt,
+            disabled_cnt=request.disabled_cnt,
             interval_minutes=request.interval_minutes,
             max_attempts=request.max_attempts,
             time=request.time,
@@ -375,12 +393,94 @@ async def get_scheduler_status():
     for status in BookingStatus:
         status_counts[status.value] = sum(1 for task in tasks if task.status == status)
     
+    # Test THSR website connectivity
+    thsr_status = await test_thsr_connectivity()
+    
     return {
         "running": scheduler.running,
         "total_tasks": len(tasks),
         "status_breakdown": status_counts,
-        "storage_path": str(scheduler.storage_path)
+        "storage_path": str(scheduler.storage_path),
+        "thsr_connectivity": thsr_status
     }
+
+
+@app.get("/health/thsr")
+async def test_thsr_connectivity():
+    """Test connectivity to THSR official website."""
+    try:
+        import time
+        import random
+        from .flows import _headers
+        
+        # Generate random session-like parameters to simulate different users/devices
+        session_params = {
+            'user_agent_suffix': f"_{random.randint(1000, 9999)}",
+            'timestamp': str(int(time.time())),
+            'random_id': random.randint(100000, 999999)
+        }
+        
+        headers = _headers()
+        headers['User-Agent'] += session_params['user_agent_suffix']
+        headers['X-Requested-With'] = 'XMLHttpRequest'
+        headers['X-Session-ID'] = f"session_{session_params['random_id']}_{session_params['timestamp']}"
+        
+        # Test main booking page
+        start_time = time.time()
+        response = requests.get(
+            "https://irs.thsrc.com.tw/IMINT/?locale=tw",
+            headers=headers,
+            timeout=10,
+            allow_redirects=True
+        )
+        response_time = round((time.time() - start_time) * 1000, 2)
+        
+        if response.status_code == 200:
+            # Check if the page contains expected THSR content
+            if "高鐵" in response.text or "THSR" in response.text or "Taiwan High Speed Rail" in response.text:
+                return {
+                    "status": "online",
+                    "response_time_ms": response_time,
+                    "message": "高鐵官網連線正常",
+                    "tested_at": time.time(),
+                    "session_info": f"Session ID: {session_params['random_id']}"
+                }
+            else:
+                return {
+                    "status": "degraded",
+                    "response_time_ms": response_time,
+                    "message": "高鐵官網回應異常，內容不符預期",
+                    "tested_at": time.time()
+                }
+        else:
+            return {
+                "status": "error",
+                "response_time_ms": response_time,
+                "message": f"高鐵官網連線失敗 (HTTP {response.status_code})",
+                "tested_at": time.time()
+            }
+            
+    except requests.exceptions.Timeout:
+        return {
+            "status": "timeout",
+            "response_time_ms": None,
+            "message": "高鐵官網連線逾時",
+            "tested_at": time.time()
+        }
+    except requests.exceptions.ConnectionError:
+        return {
+            "status": "offline",
+            "response_time_ms": None,
+            "message": "無法連線至高鐵官網，請檢查網路連線",
+            "tested_at": time.time()
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "response_time_ms": None,
+            "message": f"高鐵官網連線測試發生錯誤: {str(e)}",
+            "tested_at": time.time()
+        }
 
 
 @app.get("/results")
@@ -416,6 +516,9 @@ async def get_results(
                 "date": task.date,
                 "adult_cnt": task.adult_cnt,
                 "student_cnt": task.student_cnt,
+                "child_cnt": task.child_cnt,
+                "senior_cnt": task.senior_cnt,
+                "disabled_cnt": task.disabled_cnt,
                 "personal_id": task.personal_id,
                 "use_membership": task.use_membership,
                 "interval_minutes": task.interval_minutes,
@@ -428,6 +531,7 @@ async def get_results(
                 "class_type": task.class_type,
                 "no_ocr": task.no_ocr,
                 "result": getattr(task, 'result', None),
+                "success_pnr": getattr(task, 'success_pnr', None),
                 "error": getattr(task, 'error', None)
             }
             results.append(result)
@@ -506,6 +610,9 @@ async def get_task_result(task_id: str):
             "date": task.date,
             "adult_cnt": task.adult_cnt,
             "student_cnt": task.student_cnt,
+            "child_cnt": task.child_cnt,
+            "senior_cnt": task.senior_cnt,
+            "disabled_cnt": task.disabled_cnt,
             "personal_id": task.personal_id,
             "use_membership": task.use_membership,
             "interval_minutes": task.interval_minutes,
@@ -518,6 +625,7 @@ async def get_task_result(task_id: str):
             "class_type": task.class_type,
             "no_ocr": task.no_ocr,
             "result": getattr(task, 'result', None),
+            "success_pnr": getattr(task, 'success_pnr', None),
             "error": getattr(task, 'error', None)
         }
         

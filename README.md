@@ -28,6 +28,33 @@ cd THSR-Sniper
 docker compose build
 ```
 
+### Environment Setup
+
+#### Production Environment
+For production use with optimized builds:
+```bash
+# Start production environment
+docker compose up -d
+
+# Services will be available at:
+# - Frontend (production): http://localhost:3000
+# - API server: http://localhost:8000
+# - Auth service: http://localhost:8001
+```
+
+#### Development Environment
+For frontend development with hot reload:
+```bash
+# Start development environment with Vite dev server
+docker compose -f docker-compose.dev.yml up -d
+
+# Services will be available at:
+# - Frontend (development): http://localhost:5173 (with hot reload)
+# - API server: http://localhost:8000
+# - Auth service: http://localhost:8001
+```
+
+
 ### Three Operation Modes
 
 #### 1. Immediate Booking (CLI Mode)
