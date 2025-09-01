@@ -7,20 +7,19 @@ import App from './App.tsx'
 import './index.css'
 import 'react-toastify/dist/ReactToastify.css'
 
-// Type for axios error response
-interface ErrorWithResponse {
-  response?: {
-    status: number;
-  };
-}
+
 
 // Create a query client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: (failureCount: number, error: ErrorWithResponse) => {
+      retry: (failureCount: number, error: unknown) => {
         // Don't retry on 4xx errors (client errors)
-        const status = error?.response?.status;
+        const status =
+          typeof error === 'object' && error !== null && 'response' in error &&
+          typeof (error as any).response?.status === 'number'
+            ? (error as any).response.status
+            : undefined;
         if (status && status >= 400 && status < 500) {
           return false;
         }
