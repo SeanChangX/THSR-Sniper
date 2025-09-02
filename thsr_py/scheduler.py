@@ -30,6 +30,7 @@ class BookingTask:
     from_station: int
     to_station: int
     date: str
+    user_id: Optional[str] = None
     adult_cnt: Optional[int] = None
     student_cnt: Optional[int] = None
     child_cnt: Optional[int] = None
@@ -98,6 +99,7 @@ class BookingTask:
             "from_station": self.from_station,
             "to_station": self.to_station,
             "date": self.date,
+            "user_id": self.user_id,
             "adult_cnt": self.adult_cnt,
             "student_cnt": self.student_cnt,
             "child_cnt": self.child_cnt,
@@ -128,6 +130,7 @@ class BookingTask:
             from_station=data["from_station"],
             to_station=data["to_station"],
             date=data["date"],
+            user_id=data.get("user_id"),
             adult_cnt=data.get("adult_cnt"),
             student_cnt=data.get("student_cnt"),
             child_cnt=data.get("child_cnt"),
@@ -305,22 +308,36 @@ class BookingScheduler:
             self._load_tasks()
         return list(self.tasks.values())
     
-    def cancel_task(self, task_id: str) -> bool:
+    def cancel_task(self, task_id: str, user_id: Optional[str] = None) -> bool:
         """Cancel a specific task."""
         # Reload to get latest state
         self._load_tasks()
         if task_id in self.tasks:
-            self.tasks[task_id].status = BookingStatus.CANCELLED
+            task = self.tasks[task_id]
+            
+            # Check user ownership if user_id is provided
+            if user_id is not None and task.user_id != user_id:
+                self.logger.warning(f"User {user_id} attempted to cancel task {task_id} owned by {task.user_id}")
+                return False
+            
+            task.status = BookingStatus.CANCELLED
             self._save_tasks()
             self.logger.info(f"Cancelled task: {task_id}")
             return True
         return False
     
-    def remove_task(self, task_id: str) -> bool:
+    def remove_task(self, task_id: str, user_id: Optional[str] = None) -> bool:
         """Remove a task completely."""
         # Reload to get latest state
         self._load_tasks()
         if task_id in self.tasks:
+            task = self.tasks[task_id]
+            
+            # Check user ownership if user_id is provided
+            if user_id is not None and task.user_id != user_id:
+                self.logger.warning(f"User {user_id} attempted to remove task {task_id} owned by {task.user_id}")
+                return False
+            
             del self.tasks[task_id]
             self._save_tasks()
             self.logger.info(f"Removed task: {task_id}")
@@ -515,6 +532,7 @@ def create_booking_task(
     date: str,
     personal_id: str,
     use_membership: bool,
+    user_id: Optional[str] = None,
     adult_cnt: Optional[int] = None,
     student_cnt: Optional[int] = None,
     child_cnt: Optional[int] = None,
@@ -604,6 +622,7 @@ def create_booking_task(
         from_station=from_station,
         to_station=to_station,
         date=date,
+        user_id=user_id,
         personal_id=personal_id,
         use_membership=use_membership,
         adult_cnt=adult_cnt,

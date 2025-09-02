@@ -88,7 +88,7 @@ const NotificationHistory: React.FC = () => {
   };
 
   return (
-    <div className="relative">
+    <div className="relative inline-block">
       {/* Notification History Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
@@ -107,7 +107,15 @@ const NotificationHistory: React.FC = () => {
 
       {/* Notification History Panel */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-bg-card border border-gray-700 rounded-lg shadow-xl z-50 max-h-96 overflow-hidden notification-panel">
+        <>
+          {/* Background overlay for mobile */}
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+            onClick={() => setIsOpen(false)}
+          />
+          
+          {/* Panel */}
+          <div className="fixed inset-4 sm:inset-8 md:absolute md:right-0 md:top-full md:mt-2 md:w-96 md:inset-auto bg-bg-card border border-gray-700 rounded-lg shadow-xl z-50 max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)] md:max-h-80 overflow-hidden notification-panel">
           <div className="flex items-center justify-between p-3 border-b border-gray-700">
             <h3 className="text-sm font-medium text-text-primary">通知歷史</h3>
             <div className="flex items-center gap-2">
@@ -145,7 +153,7 @@ const NotificationHistory: React.FC = () => {
                       {getTypeIcon(notification.type)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm text-text-primary break-words">
+                      <p className="text-sm text-text-primary break-words leading-relaxed whitespace-normal overflow-wrap-anywhere">
                         {notification.message}
                       </p>
                       <p className="text-xs text-text-muted mt-1">
@@ -157,7 +165,8 @@ const NotificationHistory: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

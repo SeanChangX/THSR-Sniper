@@ -46,27 +46,40 @@ const processQueue = (error: any, token: string | null = null) => {
 const addAuthInterceptor = (client: any) => {
   client.interceptors.request.use(
     (config: AxiosRequestConfig) => {
-      // Check multiple sources for token
-      let token = localStorage.getItem('auth_token');
+      // Check multiple sources for token with priority order
+      let token = null;
       
+      // 1. Check localStorage first (most reliable)
+      token = localStorage.getItem('auth_token');
+      
+      // 2. Check zustand store if localStorage is empty
       if (!token) {
         try {
           const authStorage = localStorage.getItem('auth-storage');
           if (authStorage) {
             const parsed = JSON.parse(authStorage);
             token = parsed?.state?.token || null;
+            // Sync to localStorage for consistency
+            if (token) {
+              localStorage.setItem('auth_token', token);
+            }
           }
         } catch (e) {
           console.error('Error parsing auth storage:', e);
         }
       }
       
+      // Always add token if available
       if (token) {
         config.headers = config.headers || {};
         config.headers.Authorization = `Bearer ${token}`;
-        console.log('Added Authorization header:', `Bearer ${token.substring(0, 20)}...`);
+        console.log('Added Authorization header for API request:', config.url);
       } else {
-        console.log('No token found in localStorage');
+        console.log('No token found for API request:', config.url);
+        // For protected endpoints, reject the request immediately
+        if (config.url && !config.url.includes('/auth/') && !config.url.includes('/login') && !config.url.includes('/register')) {
+          console.warn('Attempting to access protected endpoint without token:', config.url);
+        }
       }
       
       return config;
@@ -127,8 +140,11 @@ const addResponseInterceptor = (client: any) => {
         } catch (refreshError) {
           processQueue(refreshError, null);
           
-          // Clear auth data and redirect to login
+          // Clear all auth data and redirect to login
           localStorage.removeItem('auth-storage');
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('notificationHistory');
           window.location.href = '/login';
           
           return Promise.reject(refreshError);
@@ -159,7 +175,7 @@ const handleApiError = (error: any, showToast = true) => {
                   error.message || 
                   'An unexpected error occurred';
   
-  // Don't show toast for authentication errors that are expected
+  // Don't show toast for authentication errors that are expected (except login)
   const shouldShowToast = showToast && !(error.response?.status === 401 || error.response?.status === 403);
   
   // Deduplicate identical error messages within 1 second
@@ -175,6 +191,17 @@ const handleApiError = (error: any, showToast = true) => {
   throw new Error(message);
 };
 
+// Special error handler for login that always shows toast
+const handleLoginError = (error: any) => {
+  const message = error.response?.data?.detail || 
+                  error.response?.data?.message || 
+                  error.message || 
+                  '登入失敗';
+  
+  toast.error(message);
+  throw new Error(message);
+};
+
 // Authentication API
 export const authApi = {
   async login(credentials: LoginCredentials): Promise<Token> {
@@ -182,7 +209,7 @@ export const authApi = {
       const response = await authClient.post('/login', credentials);
       return response.data;
     } catch (error) {
-      handleApiError(error);
+      handleLoginError(error);
       throw error;
     }
   },
@@ -312,15 +339,7 @@ export const thsrApi = {
     }
   },
 
-  async getTasks(): Promise<TaskStatusResponse[]> {
-    try {
-      const response = await apiClient.get('/tasks');
-      return response.data;
-    } catch (error) {
-      handleApiError(error);
-      throw error;
-    }
-  },
+
 
   async getTask(taskId: string): Promise<TaskStatusResponse> {
     try {

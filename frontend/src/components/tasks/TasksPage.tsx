@@ -48,7 +48,14 @@ const TasksPage: React.FC = () => {
       status: selectedStatus === 'all' ? undefined : selectedStatus,
       limit: 50
     }),
-    { refetchInterval: 5000 }
+    { 
+      refetchInterval: 5000,
+      onError: (error: any) => {
+        if (error.response?.status === 401) {
+          console.log('Authentication required for task management');
+        }
+      }
+    }
   );
 
   const { data: stations = [] } = useQuery('stations', thsrApi.getStations);

@@ -25,7 +25,14 @@ const Dashboard: React.FC = () => {
   const { data: tasks, isLoading: tasksLoading } = useQuery(
     'recentTasks',
     () => thsrApi.getResults({ limit: 5 }),
-    { refetchInterval: 5000 }
+    { 
+      refetchInterval: 5000,
+      onError: (error: any) => {
+        if (error.response?.status === 401) {
+          console.log('Authentication required for recent tasks');
+        }
+      }
+    }
   );
 
   const { data: stations = [] } = useQuery('stations', thsrApi.getStations);

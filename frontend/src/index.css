@@ -199,9 +199,10 @@
       @apply px-3 py-2 text-xs;
     }
     
-    /* Ensure notification panel doesn't overflow on small screens */
+    /* Notification panel responsive styles */
     .notification-panel {
-      @apply max-w-[calc(100vw-2rem)] right-1;
+      /* Mobile: full-screen-like with margins */
+      /* Desktop: small dropdown panel */
     }
   }
   

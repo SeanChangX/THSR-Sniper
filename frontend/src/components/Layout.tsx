@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { useQueryClient } from 'react-query';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
 import { toast } from 'react-toastify';
@@ -50,16 +51,25 @@ const CloseIcon = () => (
 
 const Layout: React.FC = () => {
   const { user, logout } = useAuthStore();
+  const queryClient = useQueryClient();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
+      // Clear all React Query cache to prevent data leakage
+      queryClient.clear();
+      
+      // Call logout API
       await authApi.logout();
+      
+      // Clear auth state and localStorage
       logout();
+      
       toast.success('Successfully logged out');
     } catch (error) {
       // Even if API call fails, we still logout locally
+      queryClient.clear();
       logout();
       toast.success('Logged out');
     }

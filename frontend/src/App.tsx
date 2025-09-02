@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { useQuery } from 'react-query';
+import { useQuery, useQueryClient } from 'react-query';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
 
@@ -41,6 +41,30 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 const App: React.FC = () => {
   const { isAuthenticated, setUser, logout, token } = useAuthStore();
+  const queryClient = useQueryClient();
+
+  // Session validation on app start
+  useEffect(() => {
+    const validateSession = async () => {
+      // Check if we have a token but no user data
+      const hasToken = !!localStorage.getItem('auth_token') || !!token;
+      const hasAuthStorage = !!localStorage.getItem('auth-storage');
+      
+      if (hasToken || hasAuthStorage) {
+        // If we have tokens but not authenticated, clear everything
+        if (!isAuthenticated) {
+          console.log('Found stale session data, clearing...');
+          queryClient.clear();
+          localStorage.removeItem('auth-storage');
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('notificationHistory');
+        }
+      }
+    };
+
+    validateSession();
+  }, [isAuthenticated, token, queryClient]);
 
   // Auto-fetch user data if authenticated
   const { isLoading } = useQuery(
@@ -57,6 +81,8 @@ const App: React.FC = () => {
         // Only logout if it's an authentication error (401/403)
         if (err && typeof err === 'object' && 'response' in err && 
             ((err.response as any)?.status === 401 || (err.response as any)?.status === 403)) {
+          // Clear everything on auth error
+          queryClient.clear();
           logout();
         }
       },

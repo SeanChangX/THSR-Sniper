@@ -15,7 +15,8 @@ interface BookingFormProps {
 
 const BookingForm: React.FC<BookingFormProps> = ({ stations, timeSlots, thsrInfo }) => {
   const navigate = useNavigate();
-  const [bookingMode, setBookingMode] = useState<'immediate' | 'scheduled'>('immediate');
+  // Temporarily hide booking mode selection, use only scheduled booking
+  const [bookingMode] = useState<'immediate' | 'scheduled'>('scheduled');
   
   const {
     register,
@@ -182,7 +183,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ stations, timeSlots, thsrInfo
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      {/* Booking Mode Selection */}
+      {/* Booking Mode Selection - Temporarily Hidden */}
+      {/* 
       <div className="rog-card">
         <div className="rog-card-header">
           <h3 className="rog-card-title">
@@ -236,6 +238,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ stations, timeSlots, thsrInfo
           </label>
         </div>
       </div>
+      */}
 
       {/* Basic Booking Information */}
       <div className="rog-card">
@@ -598,14 +601,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ stations, timeSlots, thsrInfo
           {isSubmitting ? (
             <>
               <LoadingSpinner size="small" />
-              {bookingMode === 'immediate' ? '執行中...' : '建立中...'}
+              建立中...
             </>
           ) : (
             <>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
               </svg>
-              {bookingMode === 'immediate' ? '立即訂票' : '建立排程'}
+              建立排程
             </>
           )}
         </button>

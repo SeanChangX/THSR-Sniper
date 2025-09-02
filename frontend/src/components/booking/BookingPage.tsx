@@ -44,7 +44,7 @@ const BookingPage: React.FC = () => {
           </h1>
         </div>
         <p className="text-text-muted">
-          設定您的訂票需求，系統將自動為您搶票。支援立即訂票和排程訂票兩種模式。
+          設定您的訂票需求，系統將自動為您搶票。
         </p>
       </div>
 
@@ -65,24 +65,7 @@ const BookingPage: React.FC = () => {
             使用說明
           </h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h4 className="font-semibold text-text-primary mb-3">立即訂票</h4>
-            <ul className="space-y-2 text-text-muted text-sm">
-              <li className="flex items-start gap-2">
-                <span className="text-rog-success mt-1">•</span>
-                立即執行一次訂票嘗試
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-rog-success mt-1">•</span>
-                適合確定有票的時段
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-rog-success mt-1">•</span>
-                執行時間較短，結果立即反饋
-              </li>
-            </ul>
-          </div>
+        <div className="grid grid-cols-1 gap-6">
           <div>
             <h4 className="font-semibold text-text-primary mb-3">排程訂票</h4>
             <ul className="space-y-2 text-text-muted text-sm">

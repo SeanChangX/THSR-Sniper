@@ -61,8 +61,12 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: false,
           thsrInfo: null,
         });
-        // Clear localStorage
+        // Clear all auth-related localStorage
         localStorage.removeItem('auth-storage');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('refresh_token');
+        // Clear notification history to prevent data leakage
+        localStorage.removeItem('notificationHistory');
       },
 
       clearAuth: () => {

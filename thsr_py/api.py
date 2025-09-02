@@ -4,10 +4,11 @@ import requests
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator, model_validator
 import uvicorn
+import requests
 
 from .scheduler import (
     BookingTask, BookingStatus, 
@@ -15,6 +16,31 @@ from .scheduler import (
 )
 from .schema import STATION_MAP, TIME_TABLE
 from .flows import run as run_booking_flow
+
+# Authentication dependency
+async def get_current_user(authorization: str = Header(None)) -> Optional[str]:
+    """Extract user ID from authorization header."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    
+    token = authorization.split(" ")[1]
+    
+    # Verify token with auth service
+    try:
+        auth_service_url = "http://thsr-sniper-auth:8001"
+        response = requests.get(
+            f"{auth_service_url}/me",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            user_data = response.json()
+            return user_data.get("id")
+    except Exception as e:
+        print(f"Auth verification failed: {e}")
+    
+    return None
 
 
 # Pydantic models for API request/response
@@ -269,7 +295,10 @@ async def immediate_booking(request: BookingRequest):
 
 
 @app.post("/schedule", response_model=BookingResponse)
-async def schedule_booking(request: ScheduledBookingRequest):
+async def schedule_booking(
+    request: ScheduledBookingRequest,
+    current_user_id: Optional[str] = Depends(get_current_user)
+):
     """Schedule a booking task for periodic execution."""
     try:
         # Create booking task
@@ -279,6 +308,7 @@ async def schedule_booking(request: ScheduledBookingRequest):
             date=request.date,
             personal_id=request.personal_id,
             use_membership=request.use_membership,
+            user_id=current_user_id,  # Associate task with current user
             adult_cnt=request.adult_cnt,
             student_cnt=request.student_cnt,
             child_cnt=request.child_cnt,
@@ -308,10 +338,17 @@ async def schedule_booking(request: ScheduledBookingRequest):
 
 
 @app.get("/tasks", response_model=List[TaskStatusResponse])
-async def list_tasks():
-    """List all scheduled booking tasks."""
+async def list_tasks(current_user_id: Optional[str] = Depends(get_current_user)):
+    """List scheduled booking tasks for the authenticated user."""
+    # Require authentication for task access
+    if not current_user_id:
+        raise HTTPException(status_code=401, detail="Authentication required to access tasks")
+    
     scheduler = get_scheduler()
     tasks = scheduler.list_tasks()
+    
+    # Filter by user
+    tasks = [task for task in tasks if task.user_id == current_user_id]
     
     return [
         TaskStatusResponse(
@@ -332,13 +369,24 @@ async def list_tasks():
 
 
 @app.get("/tasks/{task_id}", response_model=TaskStatusResponse)
-async def get_task_status(task_id: str):
+async def get_task_status(
+    task_id: str,
+    current_user_id: Optional[str] = Depends(get_current_user)
+):
     """Get status of a specific task."""
+    # Require authentication for task access
+    if not current_user_id:
+        raise HTTPException(status_code=401, detail="Authentication required to access tasks")
+    
     scheduler = get_scheduler()
     task = scheduler.get_task(task_id)
     
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    
+    # Check task ownership
+    if task.user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied: You can only view your own tasks")
     
     return TaskStatusResponse(
         id=task.id,
@@ -356,11 +404,26 @@ async def get_task_status(task_id: str):
 
 
 @app.delete("/tasks/{task_id}", response_model=BookingResponse)
-async def cancel_task(task_id: str):
+async def cancel_task(
+    task_id: str,
+    current_user_id: Optional[str] = Depends(get_current_user)
+):
     """Cancel a scheduled booking task."""
-    scheduler = get_scheduler()
+    # Require authentication for task access
+    if not current_user_id:
+        raise HTTPException(status_code=401, detail="Authentication required to access tasks")
     
-    if scheduler.cancel_task(task_id):
+    scheduler = get_scheduler()
+    task = scheduler.get_task(task_id)
+    
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    # Check task ownership
+    if task.user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied: You can only cancel your own tasks")
+    
+    if scheduler.cancel_task(task_id, current_user_id):
         return BookingResponse(
             success=True,
             message=f"Task {task_id} cancelled successfully"
@@ -370,11 +433,26 @@ async def cancel_task(task_id: str):
 
 
 @app.delete("/tasks/{task_id}/remove", response_model=BookingResponse)
-async def remove_task(task_id: str):
+async def remove_task(
+    task_id: str,
+    current_user_id: Optional[str] = Depends(get_current_user)
+):
     """Remove a task completely."""
-    scheduler = get_scheduler()
+    # Require authentication for task access
+    if not current_user_id:
+        raise HTTPException(status_code=401, detail="Authentication required to access tasks")
     
-    if scheduler.remove_task(task_id):
+    scheduler = get_scheduler()
+    task = scheduler.get_task(task_id)
+    
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    # Check task ownership
+    if task.user_id != current_user_id:
+        raise HTTPException(status_code=403, detail="Access denied: You can only remove your own tasks")
+    
+    if scheduler.remove_task(task_id, current_user_id):
         return BookingResponse(
             success=True,
             message=f"Task {task_id} removed successfully"
@@ -514,12 +592,20 @@ async def test_thsr_connectivity():
 async def get_results(
     status: Optional[str] = Query(None, description="Filter by status (pending/running/success/failed/cancelled/expired)"),
     limit: int = Query(50, ge=1, le=1000, description="Maximum number of results"),
-    offset: int = Query(0, ge=0, description="Number of results to skip")
+    offset: int = Query(0, ge=0, description="Number of results to skip"),
+    current_user_id: Optional[str] = Depends(get_current_user)
 ):
     """Get booking results with optional filtering."""
     try:
+        # Require authentication for task access
+        if not current_user_id:
+            raise HTTPException(status_code=401, detail="Authentication required to access tasks")
+        
         scheduler = get_scheduler()
         tasks = scheduler.list_tasks()
+        
+        # Filter by user
+        tasks = [task for task in tasks if task.user_id == current_user_id]
         
         # Filter by status if specified
         if status:
@@ -575,11 +661,18 @@ async def get_results(
 
 
 @app.get("/results/stats")
-async def get_results_stats():
+async def get_results_stats(current_user_id: Optional[str] = Depends(get_current_user)):
     """Get booking results statistics."""
     try:
+        # Require authentication for stats access
+        if not current_user_id:
+            raise HTTPException(status_code=401, detail="Authentication required to access task statistics")
+        
         scheduler = get_scheduler()
         tasks = scheduler.list_tasks()
+        
+        # Filter by user
+        tasks = [task for task in tasks if task.user_id == current_user_id]
         
         if not tasks:
             return {
@@ -619,14 +712,25 @@ async def get_results_stats():
 
 
 @app.get("/results/{task_id}")
-async def get_task_result(task_id: str):
+async def get_task_result(
+    task_id: str,
+    current_user_id: Optional[str] = Depends(get_current_user)
+):
     """Get detailed result for a specific task."""
     try:
+        # Require authentication for task access
+        if not current_user_id:
+            raise HTTPException(status_code=401, detail="Authentication required to access tasks")
+        
         scheduler = get_scheduler()
         task = scheduler.get_task(task_id)
         
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
+        
+        # Check task ownership
+        if task.user_id != current_user_id:
+            raise HTTPException(status_code=403, detail="Access denied: You can only view your own tasks")
         
         # Detailed task information
         result = {
