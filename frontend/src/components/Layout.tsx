@@ -79,17 +79,17 @@ const Layout: React.FC = () => {
       {/* Header */}
       <header className="bg-bg-card border-b border-gray-800 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex justify-between items-center h-16 header-content">
             {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-rog-primary to-rog-accent rounded-lg flex items-center justify-center">
-                <img src="/thsr-sniper-logo.svg" alt="THSR Sniper" className="w-8 h-8" />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-rog-primary to-rog-accent rounded-lg flex items-center justify-center flex-shrink-0">
+                <img src="/thsr-sniper-logo.svg" alt="THSR Sniper" className="w-6 h-6 sm:w-8 sm:h-8" />
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-text-primary font-gaming">
+              <div className="min-w-0">
+                <h1 className="text-sm sm:text-xl font-bold text-text-primary font-gaming truncate">
                   THSR Sniper
                 </h1>
-                <p className="text-xs text-text-muted">高鐵訂票系統</p>
+                <p className="text-xs text-text-muted hidden sm:block">高鐵訂票系統</p>
               </div>
             </div>
 
@@ -128,19 +128,19 @@ const Layout: React.FC = () => {
             </nav>
 
             {/* User Menu */}
-            <div className="flex items-center gap-4">
-              <div className="hidden md:block text-right">
-                <p className="text-sm font-medium text-text-primary">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+              <div className="hidden md:block text-right min-w-0">
+                <p className="text-sm font-medium text-text-primary truncate">
                   {user?.full_name || user?.username}
                 </p>
-                <p className="text-xs text-text-muted">{user?.email}</p>
+                <p className="text-xs text-text-muted truncate">{user?.email}</p>
               </div>
               
               <NotificationHistory />
               
               <button
                 onClick={handleLogout}
-                className="rog-btn rog-btn-secondary flex items-center gap-2"
+                className="rog-btn rog-btn-secondary flex items-center gap-1 sm:gap-2 px-2 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm"
               >
                 <LogoutIcon />
                 <span className="hidden sm:inline">登出</span>
@@ -149,7 +149,7 @@ const Layout: React.FC = () => {
               {/* Mobile menu button */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="lg:hidden p-2 text-text-primary hover:bg-bg-input rounded-lg"
+                className="lg:hidden p-2 text-text-primary hover:bg-bg-input rounded-lg flex-shrink-0"
               >
                 {isMobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
               </button>

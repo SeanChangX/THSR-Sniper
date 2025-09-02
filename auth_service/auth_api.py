@@ -187,9 +187,9 @@ async def health_check():
         # Test database connection
         db = next(get_database())
         db.execute("SELECT 1")
-        return {"status": "healthy", "service": "thsr-auth", "database": "connected"}
+        return {"status": "healthy", "service": "thsr-sniper-auth", "database": "connected"}
     except Exception as e:
-        return {"status": "unhealthy", "service": "thsr-auth", "error": str(e)}
+        return {"status": "unhealthy", "service": "thsr-sniper-auth", "error": str(e)}
 
 
 @app.post("/register", response_model=UserResponse)

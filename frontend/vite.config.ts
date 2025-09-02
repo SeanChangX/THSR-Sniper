@@ -15,12 +15,12 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://thsr-api:8000',
+        target: 'http://thsr-sniper-api:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
       },
       '/auth': {
-        target: 'http://thsr-auth:8001',
+        target: 'http://thsr-sniper-auth:8001',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/auth/, '')
       }

@@ -393,30 +393,48 @@ async def get_scheduler_status():
     for status in BookingStatus:
         status_counts[status.value] = sum(1 for task in tasks if task.status == status)
     
-    # Test THSR website connectivity
-    thsr_status = await test_thsr_connectivity()
+    # THSR website connectivity check disabled
+    # thsr_status = await test_thsr_connectivity()
     
     return {
         "running": scheduler.running,
         "total_tasks": len(tasks),
         "status_breakdown": status_counts,
         "storage_path": str(scheduler.storage_path),
-        "thsr_connectivity": thsr_status
+        # "thsr_connectivity": thsr_status
     }
 
 
+
+
+
+# Cache for THSR connectivity status to avoid frequent external requests
+_thsr_connectivity_cache = {
+    "status": None,
+    "last_checked": 0,
+    "cache_duration": 60  # Cache for 60 seconds
+}
+
 @app.get("/health/thsr")
 async def test_thsr_connectivity():
-    """Test connectivity to THSR official website."""
+    """Test connectivity to THSR official website with caching and async optimization."""
+    import time
+    import asyncio
+    import aiohttp
+    import random
+    from .flows import _headers
+    
+    # Check cache first
+    current_time = time.time()
+    if (_thsr_connectivity_cache["status"] is not None and 
+        current_time - _thsr_connectivity_cache["last_checked"] < _thsr_connectivity_cache["cache_duration"]):
+        return _thsr_connectivity_cache["status"]
+    
     try:
-        import time
-        import random
-        from .flows import _headers
-        
         # Generate random session-like parameters to simulate different users/devices
         session_params = {
             'user_agent_suffix': f"_{random.randint(1000, 9999)}",
-            'timestamp': str(int(time.time())),
+            'timestamp': str(int(current_time)),
             'random_id': random.randint(100000, 999999)
         }
         
@@ -425,62 +443,71 @@ async def test_thsr_connectivity():
         headers['X-Requested-With'] = 'XMLHttpRequest'
         headers['X-Session-ID'] = f"session_{session_params['random_id']}_{session_params['timestamp']}"
         
-        # Test main booking page
+        # Use async HTTP client with shorter timeout and HEAD request for faster response
         start_time = time.time()
-        response = requests.get(
-            "https://irs.thsrc.com.tw/IMINT/?locale=tw",
-            headers=headers,
-            timeout=10,
-            allow_redirects=True
-        )
-        response_time = round((time.time() - start_time) * 1000, 2)
         
-        if response.status_code == 200:
-            # Check if the page contains expected THSR content
-            if "高鐵" in response.text or "THSR" in response.text or "Taiwan High Speed Rail" in response.text:
-                return {
-                    "status": "online",
-                    "response_time_ms": response_time,
-                    "message": "高鐵官網連線正常",
-                    "tested_at": time.time(),
-                    "session_info": f"Session ID: {session_params['random_id']}"
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+            # First try HEAD request for faster response
+            try:
+                async with session.head(
+                    "https://irs.thsrc.com.tw/IMINT/?locale=tw",
+                    headers=headers,
+                    allow_redirects=True
+                ) as response:
+                    response_time = round((time.time() - start_time) * 1000, 2)
+                    
+                    if response.status == 200:
+                        result = {
+                            "status": "online",
+                            "response_time_ms": response_time,
+                            "message": "高鐵官網連線正常",
+                            "tested_at": current_time,
+                            "session_info": f"Session ID: {session_params['random_id']}"
+                        }
+                    else:
+                        result = {
+                            "status": "error",
+                            "response_time_ms": response_time,
+                            "message": f"高鐵官網連線失敗 (HTTP {response.status})",
+                            "tested_at": current_time
+                        }
+            except asyncio.TimeoutError:
+                result = {
+                    "status": "timeout",
+                    "response_time_ms": None,
+                    "message": "高鐵官網連線逾時",
+                    "tested_at": current_time
                 }
-            else:
-                return {
-                    "status": "degraded",
-                    "response_time_ms": response_time,
-                    "message": "高鐵官網回應異常，內容不符預期",
-                    "tested_at": time.time()
+            except aiohttp.ClientConnectorError:
+                result = {
+                    "status": "offline",
+                    "response_time_ms": None,
+                    "message": "無法連線至高鐵官網，請檢查網路連線",
+                    "tested_at": current_time
                 }
-        else:
-            return {
-                "status": "error",
-                "response_time_ms": response_time,
-                "message": f"高鐵官網連線失敗 (HTTP {response.status_code})",
-                "tested_at": time.time()
-            }
+            except Exception as e:
+                result = {
+                    "status": "error",
+                    "response_time_ms": None,
+                    "message": f"高鐵官網連線測試發生錯誤: {str(e)}",
+                    "tested_at": current_time
+                }
+        
+        # Update cache
+        _thsr_connectivity_cache["status"] = result
+        _thsr_connectivity_cache["last_checked"] = current_time
+        
+        return result
             
-    except requests.exceptions.Timeout:
-        return {
-            "status": "timeout",
-            "response_time_ms": None,
-            "message": "高鐵官網連線逾時",
-            "tested_at": time.time()
-        }
-    except requests.exceptions.ConnectionError:
-        return {
-            "status": "offline",
-            "response_time_ms": None,
-            "message": "無法連線至高鐵官網，請檢查網路連線",
-            "tested_at": time.time()
-        }
     except Exception as e:
-        return {
+        error_result = {
             "status": "error",
             "response_time_ms": None,
             "message": f"高鐵官網連線測試發生錯誤: {str(e)}",
-            "tested_at": time.time()
+            "tested_at": current_time
         }
+        # Don't cache errors
+        return error_result
 
 
 @app.get("/results")

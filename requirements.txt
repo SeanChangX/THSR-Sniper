@@ -1,5 +1,6 @@
 # Web scraping and HTTP requests
 requests==2.32.3
+aiohttp>=3.8.0
 beautifulsoup4==4.12.3
 
 # Image processing and OCR

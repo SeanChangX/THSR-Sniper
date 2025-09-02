@@ -107,7 +107,7 @@ const NotificationHistory: React.FC = () => {
 
       {/* Notification History Panel */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-bg-card border border-gray-700 rounded-lg shadow-xl z-50 max-h-96 overflow-hidden">
+        <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-bg-card border border-gray-700 rounded-lg shadow-xl z-50 max-h-96 overflow-hidden notification-panel">
           <div className="flex items-center justify-between p-3 border-b border-gray-700">
             <h3 className="text-sm font-medium text-text-primary">通知歷史</h3>
             <div className="flex items-center gap-2">
@@ -139,13 +139,13 @@ const NotificationHistory: React.FC = () => {
                 {notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className="flex items-start gap-3 p-3 hover:bg-bg-input rounded-lg transition-colors"
+                    className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 hover:bg-bg-input rounded-lg transition-colors"
                   >
                     <div className={`flex-shrink-0 ${getTypeColor(notification.type)}`}>
                       {getTypeIcon(notification.type)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-text-primary break-words">
+                      <p className="text-xs sm:text-sm text-text-primary break-words">
                         {notification.message}
                       </p>
                       <p className="text-xs text-text-muted mt-1">

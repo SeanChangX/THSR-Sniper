@@ -67,8 +67,8 @@ const Dashboard: React.FC = () => {
               <p className="text-text-muted text-sm">
                 總任務數: {schedulerStatus?.total_tasks || 0}
               </p>
-              {/* THSR Connectivity Status */}
-              {schedulerStatus?.thsr_connectivity && (
+              {/* THSR Connectivity Status - DISABLED */}
+              {/* {schedulerStatus?.thsr_connectivity && (
                 <div className="mt-2 pt-2 border-t border-border-subtle">
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${
@@ -94,7 +94,7 @@ const Dashboard: React.FC = () => {
                     </p>
                   )}
                 </div>
-              )}
+              )} */}
             </div>
           )}
         </div>

@@ -193,6 +193,32 @@
     .rog-btn {
       @apply w-full;
     }
+    
+    /* Mobile header adjustments */
+    .nav-tab {
+      @apply px-3 py-2 text-xs;
+    }
+    
+    /* Ensure notification panel doesn't overflow on small screens */
+    .notification-panel {
+      @apply max-w-[calc(100vw-2rem)] right-1;
+    }
+  }
+  
+  /* Extra small screens */
+  @media (max-width: 480px) {
+    .rog-card {
+      @apply p-3;
+    }
+    
+    .rog-btn {
+      @apply px-4 py-2 text-xs;
+    }
+    
+    /* Make sure header elements don't overflow */
+    .header-content {
+      @apply min-w-0;
+    }
   }
 }
 
