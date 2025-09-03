@@ -65,13 +65,13 @@ const Layout: React.FC = () => {
       
       // Clear auth state and localStorage
       logout();
-      
-      toast.success('Successfully logged out');
+
+      toast.success('登出成功');
     } catch (error) {
       // Even if API call fails, we still logout locally
       queryClient.clear();
       logout();
-      toast.success('Logged out');
+      toast.success('登出成功');
     }
   };
 

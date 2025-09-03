@@ -14,20 +14,35 @@ from datetime import datetime
 class THSRApiClient:
     """Client for interacting with THSR-Sniper API."""
     
-    def __init__(self, base_url: str = "http://localhost:8000"):
+    def __init__(self, base_url: str = None, use_cli_auth: bool = True):
+        # Auto-detect API URL based on environment
+        if base_url is None:
+            import os
+            # Check if running in Docker (presence of /.dockerenv or hostname matching container pattern)
+            if os.path.exists('/.dockerenv') or os.environ.get('HOSTNAME', '').startswith('thsr-sniper'):
+                base_url = "http://thsr-sniper-api:8000"  # Docker internal network
+            else:
+                base_url = "http://localhost:8000"  # Local development
+        
         self.base_url = base_url.rstrip('/')
+        self.use_cli_auth = use_cli_auth
         
     def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None) -> Dict[str, Any]:
         """Make HTTP request to API."""
         url = f"{self.base_url}{endpoint}"
         
+        # Add CLI internal authentication header
+        headers = {}
+        if self.use_cli_auth:
+            headers["X-Internal-CLI"] = "thsr-cli-internal"
+        
         try:
             if method.upper() == "GET":
-                response = requests.get(url, timeout=30)
+                response = requests.get(url, headers=headers, timeout=30)
             elif method.upper() == "POST":
-                response = requests.post(url, json=data, timeout=30)
+                response = requests.post(url, json=data, headers=headers, timeout=30)
             elif method.upper() == "DELETE":
-                response = requests.delete(url, timeout=30)
+                response = requests.delete(url, headers=headers, timeout=30)
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")
                 
@@ -192,11 +207,28 @@ def print_task_list(tasks: list) -> None:
             
             # Ticket summary
             tickets = []
-            if task.get('adult_cnt'):
+            if task.get('adult_cnt') and task['adult_cnt'] > 0:
                 tickets.append(f"{task['adult_cnt']}A")
-            if task.get('student_cnt'):
+            if task.get('student_cnt') and task['student_cnt'] > 0:
                 tickets.append(f"{task['student_cnt']}S")
-            ticket_str = f"[{','.join(tickets)}]" if tickets else "[?]"
+            if task.get('child_cnt') and task['child_cnt'] > 0:
+                tickets.append(f"{task['child_cnt']}C")
+            if task.get('senior_cnt') and task['senior_cnt'] > 0:
+                tickets.append(f"{task['senior_cnt']}Sr")
+            if task.get('disabled_cnt') and task['disabled_cnt'] > 0:
+                tickets.append(f"{task['disabled_cnt']}D")
+            ticket_str = f"[{','.join(tickets)}]" if tickets else "[1A]"  # Default to 1 adult if none specified
+            
+            # Time info
+            time_info = ""
+            if task.get('time'):
+                from .schema import TIME_TABLE
+                if task['time'] <= len(TIME_TABLE):
+                    time_info = f" @{TIME_TABLE[task['time']-1]}"
+                else:
+                    time_info = f" @T{task['time']}"
+            elif task.get('train_index'):
+                time_info = f" #{task['train_index']}"
             
             # Success info
             extra_info = ""
@@ -206,7 +238,7 @@ def print_task_list(tasks: list) -> None:
                 extra_info = f" | × Error: {task['error_message'][:30]}..."
             
             task_symbol = "✓" if task['status'].lower() in ['completed', 'success'] else "○" if task['status'].lower() == 'running' else "×" if task['status'].lower() in ['failed', 'error'] else "•"
-            print(f"  {task_symbol} {task['id'][:8]}... | {status:<7} | {from_short}->{to_short} {task['date']} {ticket_str} | Attempts: {task['attempts']} | Interval: {task['interval_minutes']}m{extra_info}")
+            print(f"  {task_symbol} {task['id'][:8]}... | {status:<7} | {from_short}->{to_short} {task['date']} {ticket_str}{time_info} | Attempts: {task['attempts']} | Interval: {task['interval_minutes']}m{extra_info}")
 
 
 def show_task_status(client: THSRApiClient, task_id: str) -> None:

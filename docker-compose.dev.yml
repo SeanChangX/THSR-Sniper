@@ -9,11 +9,12 @@ services:
       - DISPLAY=${DISPLAY:-:0}
       - TERM=xterm-256color
       - THSR_FORCE_INTERACTIVE=1  # Force interactive mode for pure CLI usage
-    network_mode: host
     stdin_open: true
     tty: true
     command: bash
     restart: unless-stopped
+    networks:
+      - default
 
   # Background scheduler service
   thsr-sniper-scheduler:

@@ -9,17 +9,33 @@ import { formatStationRoute } from '@/utils/stations';
 const Dashboard: React.FC = () => {
   const { user } = useAuthStore();
 
-  // Fetch dashboard data
+  // Fetch dashboard data with improved error handling
   const { data: schedulerStatus, isLoading: statusLoading } = useQuery(
     'schedulerStatus',
     thsrApi.getSchedulerStatus,
-    { refetchInterval: 600000 } // 10 minutes
+    { 
+      refetchInterval: 600000, // 10 minutes
+      onError: (error: any) => {
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          console.log('Authentication error in scheduler status query');
+          // Error will be handled by global query client
+        }
+      }
+    }
   );
 
   const { data: stats, isLoading: statsLoading } = useQuery(
     'bookingStats',
     thsrApi.getResultsStats,
-    { refetchInterval: 10000 }
+    { 
+      refetchInterval: 10000,
+      onError: (error: any) => {
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          console.log('Authentication error in booking stats query');
+          // Error will be handled by global query client
+        }
+      }
+    }
   );
 
   const { data: tasks, isLoading: tasksLoading } = useQuery(
@@ -28,14 +44,26 @@ const Dashboard: React.FC = () => {
     { 
       refetchInterval: 5000,
       onError: (error: any) => {
-        if (error.response?.status === 401) {
-          console.log('Authentication required for recent tasks');
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          console.log('Authentication error in recent tasks query');
+          // Error will be handled by global query client
         }
       }
     }
   );
 
-  const { data: stations = [] } = useQuery('stations', thsrApi.getStations);
+  const { data: stations = [] } = useQuery(
+    'stations', 
+    thsrApi.getStations,
+    {
+      onError: (error: any) => {
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          console.log('Authentication error in stations query');
+          // Error will be handled by global query client
+        }
+      }
+    }
+  );
 
   return (
     <div className="space-y-8">

@@ -43,6 +43,22 @@ const App: React.FC = () => {
   const { isAuthenticated, setUser, logout, token } = useAuthStore();
   const queryClient = useQueryClient();
 
+  // Global authentication failure handler
+  useEffect(() => {
+    const handleAuthLogout = () => {
+      console.log('Received auth-logout event, clearing session...');
+      queryClient.clear();
+      logout();
+    };
+
+    // Listen for authentication failure events
+    window.addEventListener('auth-logout', handleAuthLogout);
+    
+    return () => {
+      window.removeEventListener('auth-logout', handleAuthLogout);
+    };
+  }, [logout, queryClient]);
+
   // Session validation on app start
   useEffect(() => {
     const validateSession = async () => {

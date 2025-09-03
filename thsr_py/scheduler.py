@@ -196,6 +196,7 @@ class BookingScheduler:
         self.running = False
         self.scheduler_thread: Optional[threading.Thread] = None
         self.logger = self._setup_logger()
+        self._last_file_mtime: Optional[float] = None  # Track file modification time
         
         # Load existing tasks if persistence is enabled
         if self.enable_persistence:
@@ -216,9 +217,29 @@ class BookingScheduler:
         
         return logger
     
-    def _load_tasks(self) -> None:
+    def _should_reload_tasks(self) -> bool:
+        """Check if tasks should be reloaded based on file modification time."""
+        if not self.enable_persistence or not self.storage_path or not self.storage_path.exists():
+            return False
+            
+        try:
+            current_mtime = self.storage_path.stat().st_mtime
+            if self._last_file_mtime is None or current_mtime > self._last_file_mtime:
+                self._last_file_mtime = current_mtime
+                return True
+            return False
+        except Exception as e:
+            self.logger.debug(f"Error checking file mtime: {e}")
+            return True  # Reload on error to be safe
+
+    def _load_tasks(self, force: bool = False) -> None:
         """Load tasks from storage file."""
         if not self.enable_persistence or not self.storage_path:
+            return
+            
+        # Skip reload if file hasn't changed (unless forced)
+        if not force and not self._should_reload_tasks():
+            self.logger.debug("Skipping task reload - file unchanged")
             return
             
         if self.storage_path.exists():
@@ -277,6 +298,11 @@ class BookingScheduler:
             
             # Atomic move
             temp_path.replace(self.storage_path)
+            
+            # Update our tracked modification time
+            if self.storage_path.exists():
+                self._last_file_mtime = self.storage_path.stat().st_mtime
+                
             self.logger.debug(f"Tasks saved successfully to {self.storage_path}")
             
         except Exception as e:
@@ -296,22 +322,20 @@ class BookingScheduler:
     
     def get_task(self, task_id: str) -> Optional[BookingTask]:
         """Get a specific task by ID."""
-        # Only reload if we don't have the task in memory
-        if task_id not in self.tasks:
-            self._load_tasks()
+        # Smart reload: only reload if file has changed
+        self._load_tasks()
         return self.tasks.get(task_id)
     
     def list_tasks(self) -> List[BookingTask]:
         """List all tasks."""
-        # Only reload if we have no tasks in memory, to avoid overwriting
-        if not self.tasks:
-            self._load_tasks()
+        # Smart reload: only reload if file has changed
+        self._load_tasks()
         return list(self.tasks.values())
     
     def cancel_task(self, task_id: str, user_id: Optional[str] = None) -> bool:
         """Cancel a specific task."""
-        # Reload to get latest state
-        self._load_tasks()
+        # Force reload to get latest state for critical operations
+        self._load_tasks(force=True)
         if task_id in self.tasks:
             task = self.tasks[task_id]
             
@@ -328,8 +352,8 @@ class BookingScheduler:
     
     def remove_task(self, task_id: str, user_id: Optional[str] = None) -> bool:
         """Remove a task completely."""
-        # Reload to get latest state
-        self._load_tasks()
+        # Force reload to get latest state for critical operations
+        self._load_tasks(force=True)
         if task_id in self.tasks:
             task = self.tasks[task_id]
             
@@ -376,6 +400,9 @@ class BookingScheduler:
         """Process all pending tasks."""
         current_time = datetime.now(timezone.utc)
         
+        # Smart reload: only reload if file has changed
+        self._load_tasks()
+        
         for task in list(self.tasks.values()):
             if task.status in [BookingStatus.SUCCESS, BookingStatus.CANCELLED]:
                 continue
@@ -397,7 +424,12 @@ class BookingScheduler:
             if task.last_attempt is None:
                 should_run = True
             else:
-                time_since_last = current_time - task.last_attempt
+                # Ensure both datetimes are timezone-aware for comparison
+                task_last_attempt = task.last_attempt
+                if task_last_attempt.tzinfo is None:
+                    task_last_attempt = task_last_attempt.replace(tzinfo=timezone.utc)
+                
+                time_since_last = current_time - task_last_attempt
                 should_run = time_since_last >= timedelta(minutes=task.interval_minutes)
             
             if should_run:
@@ -412,7 +444,7 @@ class BookingScheduler:
         original_attempts = task.attempts
         original_last_attempt = task.last_attempt
         
-        # Update task status and attempt info
+        # Update task status and attempt info with timezone-aware datetime
         task.status = BookingStatus.RUNNING
         task.last_attempt = datetime.now(timezone.utc)
         task.attempts += 1

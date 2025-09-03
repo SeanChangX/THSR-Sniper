@@ -73,9 +73,8 @@ const addAuthInterceptor = (client: any) => {
       if (token) {
         config.headers = config.headers || {};
         config.headers.Authorization = `Bearer ${token}`;
-        console.log('Added Authorization header for API request:', config.url);
+        // Token added for protected endpoint
       } else {
-        console.log('No token found for API request:', config.url);
         // For protected endpoints, reject the request immediately
         if (config.url && !config.url.includes('/auth/') && !config.url.includes('/login') && !config.url.includes('/register')) {
           console.warn('Attempting to access protected endpoint without token:', config.url);
@@ -88,13 +87,14 @@ const addAuthInterceptor = (client: any) => {
   );
 };
 
-// Response interceptor for token refresh
+// Response interceptor for token refresh and error handling
 const addResponseInterceptor = (client: any) => {
   client.interceptors.response.use(
     (response: AxiosResponse) => response,
     async (error: any) => {
       const originalRequest = error.config;
 
+      // Handle 401 errors (Unauthorized)
       if (error.response?.status === 401 && !originalRequest._retry) {
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
@@ -131,6 +131,7 @@ const addResponseInterceptor = (client: any) => {
             authStorage.state.token = newToken;
             authStorage.state.refreshToken = response.data.refresh_token;
             localStorage.setItem('auth-storage', JSON.stringify(authStorage));
+            localStorage.setItem('auth_token', newToken);
           }
 
           processQueue(null, newToken);
@@ -140,12 +141,9 @@ const addResponseInterceptor = (client: any) => {
         } catch (refreshError) {
           processQueue(refreshError, null);
           
-          // Clear all auth data and redirect to login
-          localStorage.removeItem('auth-storage');
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('refresh_token');
-          localStorage.removeItem('notificationHistory');
-          window.location.href = '/login';
+          // Force logout and redirect to login
+          console.log('Authentication failed, forcing logout...');
+          handleAuthenticationFailure();
           
           return Promise.reject(refreshError);
         } finally {
@@ -153,9 +151,32 @@ const addResponseInterceptor = (client: any) => {
         }
       }
 
+      // Handle other auth errors (403, etc.)
+      if (error.response?.status === 403) {
+        console.log('Access forbidden, forcing logout...');
+        handleAuthenticationFailure();
+      }
+
       return Promise.reject(error);
     }
   );
+};
+
+// Global authentication failure handler
+const handleAuthenticationFailure = () => {
+  // Clear all auth data
+  localStorage.removeItem('auth-storage');
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('notificationHistory');
+  
+  // Force store reset by triggering a custom event
+  window.dispatchEvent(new CustomEvent('auth-logout'));
+  
+  // Redirect to login page
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login';
+  }
 };
 
 // Add interceptors to both clients
@@ -168,19 +189,20 @@ addResponseInterceptor(authClient);
 let lastErrorTime = 0;
 let lastErrorMessage = '';
 
-// Error handler
+// Error handler with improved deduplication
 const handleApiError = (error: any, showToast = true) => {
   const message = error.response?.data?.detail || 
                   error.response?.data?.message || 
                   error.message || 
                   'An unexpected error occurred';
   
-  // Don't show toast for authentication errors that are expected (except login)
-  const shouldShowToast = showToast && !(error.response?.status === 401 || error.response?.status === 403);
+  // Don't show toast for authentication errors that will trigger auto-logout
+  const isAuthError = error.response?.status === 401 || error.response?.status === 403;
+  const shouldShowToast = showToast && !isAuthError;
   
-  // Deduplicate identical error messages within 1 second
+  // Deduplicate identical error messages within 2 seconds
   const now = Date.now();
-  const isDuplicate = lastErrorMessage === message && (now - lastErrorTime) < 1000;
+  const isDuplicate = lastErrorMessage === message && (now - lastErrorTime) < 2000;
   
   if (shouldShowToast && !isDuplicate) {
     toast.error(message);

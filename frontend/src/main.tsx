@@ -9,7 +9,7 @@ import 'react-toastify/dist/ReactToastify.css'
 
 
 
-// Create a query client
+// Create a query client with global error handling
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -20,6 +20,15 @@ const queryClient = new QueryClient({
           typeof (error as any).response?.status === 'number'
             ? (error as any).response.status
             : undefined;
+        
+        // Handle authentication errors immediately
+        if (status === 401 || status === 403) {
+          console.log('Authentication error in query, forcing logout...');
+          // Trigger auth logout event
+          window.dispatchEvent(new CustomEvent('auth-logout'));
+          return false;
+        }
+        
         if (status && status >= 400 && status < 500) {
           return false;
         }
@@ -28,6 +37,25 @@ const queryClient = new QueryClient({
       },
       staleTime: 5 * 60 * 1000, // 5 minutes
       onError: (error: any) => {
+        // Check if it's an authentication error
+        const status = error?.response?.status;
+        if (status === 401 || status === 403) {
+          console.log('Authentication error in query onError, forcing logout...');
+          // Don't show toast for auth errors, just handle logout
+          window.dispatchEvent(new CustomEvent('auth-logout'));
+          return;
+        }
+        
+        // For other errors, show toast if not suppressed
+        const message = error?.response?.data?.detail || 
+                       error?.response?.data?.message || 
+                       error?.message || 
+                       '載入資料時發生錯誤';
+        
+        // Don't show toast for expected errors or duplicates
+        if (!error?.suppressToast && !message.includes('Authentication required')) {
+          toast.error(message);
+        }
         // Only show toast for final error after all retries
         console.error('Query error:', error);
       }

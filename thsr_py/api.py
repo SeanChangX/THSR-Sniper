@@ -8,7 +8,6 @@ from fastapi import FastAPI, HTTPException, Query, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator, model_validator
 import uvicorn
-import requests
 
 from .scheduler import (
     BookingTask, BookingStatus, 
@@ -18,8 +17,14 @@ from .schema import STATION_MAP, TIME_TABLE
 from .flows import run as run_booking_flow
 
 # Authentication dependency
-async def get_current_user(authorization: str = Header(None)) -> Optional[str]:
-    """Extract user ID from authorization header."""
+async def get_current_user(authorization: str = Header(None), x_internal_cli: str = Header(None)) -> Optional[str]:
+    """Extract user ID from authorization header or allow CLI internal access."""
+    
+    # Check for internal CLI access (only when running in same Docker network)
+    if x_internal_cli == "thsr-cli-internal":
+        # Return a special CLI user ID to indicate internal access
+        return "cli-internal"
+    
     if not authorization or not authorization.startswith("Bearer "):
         return None
     
@@ -118,6 +123,13 @@ class TaskStatusResponse(BaseModel):
     from_station: int
     to_station: int
     date: str
+    adult_cnt: Optional[int] = None
+    student_cnt: Optional[int] = None
+    child_cnt: Optional[int] = None
+    senior_cnt: Optional[int] = None
+    disabled_cnt: Optional[int] = None
+    time: Optional[int] = None
+    train_index: Optional[int] = None
     interval_minutes: int
     attempts: int
     last_attempt: Optional[str]
@@ -301,6 +313,10 @@ async def schedule_booking(
 ):
     """Schedule a booking task for periodic execution."""
     try:
+        # Determine user_id for task association
+        # CLI internal access gets a special user_id, regular users get their actual user_id
+        task_user_id = "cli-user" if current_user_id == "cli-internal" else current_user_id
+        
         # Create booking task
         task = create_booking_task(
             from_station=request.from_station,
@@ -308,7 +324,7 @@ async def schedule_booking(
             date=request.date,
             personal_id=request.personal_id,
             use_membership=request.use_membership,
-            user_id=current_user_id,  # Associate task with current user
+            user_id=task_user_id,  # Associate task with appropriate user
             adult_cnt=request.adult_cnt,
             student_cnt=request.student_cnt,
             child_cnt=request.child_cnt,
@@ -347,8 +363,9 @@ async def list_tasks(current_user_id: Optional[str] = Depends(get_current_user))
     scheduler = get_scheduler()
     tasks = scheduler.list_tasks()
     
-    # Filter by user
-    tasks = [task for task in tasks if task.user_id == current_user_id]
+    # CLI internal access sees all tasks, regular users see only their own
+    if current_user_id != "cli-internal":
+        tasks = [task for task in tasks if task.user_id == current_user_id]
     
     return [
         TaskStatusResponse(
@@ -357,6 +374,13 @@ async def list_tasks(current_user_id: Optional[str] = Depends(get_current_user))
             from_station=task.from_station,
             to_station=task.to_station,
             date=task.date,
+            adult_cnt=task.adult_cnt,
+            student_cnt=task.student_cnt,
+            child_cnt=task.child_cnt,
+            senior_cnt=task.senior_cnt,
+            disabled_cnt=task.disabled_cnt,
+            time=task.time,
+            train_index=task.train_index,
             interval_minutes=task.interval_minutes,
             attempts=task.attempts,
             last_attempt=task.last_attempt.isoformat() if task.last_attempt else None,
@@ -384,8 +408,8 @@ async def get_task_status(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
-    # Check task ownership
-    if task.user_id != current_user_id:
+    # Check task ownership (CLI internal access bypasses this check)
+    if current_user_id != "cli-internal" and task.user_id != current_user_id:
         raise HTTPException(status_code=403, detail="Access denied: You can only view your own tasks")
     
     return TaskStatusResponse(
@@ -394,6 +418,13 @@ async def get_task_status(
         from_station=task.from_station,
         to_station=task.to_station,
         date=task.date,
+        adult_cnt=task.adult_cnt,
+        student_cnt=task.student_cnt,
+        child_cnt=task.child_cnt,
+        senior_cnt=task.senior_cnt,
+        disabled_cnt=task.disabled_cnt,
+        time=task.time,
+        train_index=task.train_index,
         interval_minutes=task.interval_minutes,
         attempts=task.attempts,
         last_attempt=task.last_attempt.isoformat() if task.last_attempt else None,
@@ -419,11 +450,13 @@ async def cancel_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
-    # Check task ownership
-    if task.user_id != current_user_id:
+    # Check task ownership (CLI internal access bypasses this check)
+    if current_user_id != "cli-internal" and task.user_id != current_user_id:
         raise HTTPException(status_code=403, detail="Access denied: You can only cancel your own tasks")
     
-    if scheduler.cancel_task(task_id, current_user_id):
+    # For CLI internal access, pass None as user_id to bypass user checks
+    user_check_id = None if current_user_id == "cli-internal" else current_user_id
+    if scheduler.cancel_task(task_id, user_check_id):
         return BookingResponse(
             success=True,
             message=f"Task {task_id} cancelled successfully"
@@ -448,11 +481,13 @@ async def remove_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
-    # Check task ownership
-    if task.user_id != current_user_id:
+    # Check task ownership (CLI internal access bypasses this check)
+    if current_user_id != "cli-internal" and task.user_id != current_user_id:
         raise HTTPException(status_code=403, detail="Access denied: You can only remove your own tasks")
     
-    if scheduler.remove_task(task_id, current_user_id):
+    # For CLI internal access, pass None as user_id to bypass user checks
+    user_check_id = None if current_user_id == "cli-internal" else current_user_id
+    if scheduler.remove_task(task_id, user_check_id):
         return BookingResponse(
             success=True,
             message=f"Task {task_id} removed successfully"

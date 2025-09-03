@@ -842,16 +842,56 @@ def _show_result(soup: BeautifulSoup) -> None:
     print("   3. Enjoy your journey!")
 
 
-def _try_ocr_captcha(img_bytes: bytes, max_attempts: int = 3) -> Optional[str]:
-    """Try to recognize captcha using OCR model with retry mechanism."""
+# Global OCR model instance for reuse
+_ocr_model_cache = None
+
+
+def _get_ocr_model():
+    """Get cached OCR model instance, initialize if needed."""
+    global _ocr_model_cache
+    
+    if _ocr_model_cache is not None:
+        return _ocr_model_cache
+    
     try:
         # Suppress TensorFlow logging for cleaner output
         import logging
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TF messages
         logging.getLogger('tensorflow').setLevel(logging.ERROR)
         
-        # Try to import OCR dependencies
         # Handle both development and PyInstaller bundled environments
+        if getattr(sys, 'frozen', False):
+            # Running in PyInstaller bundle
+            bundle_dir = Path(sys._MEIPASS)
+            sys.path.append(str(bundle_dir / "thsr_ocr"))
+            model_path = str(bundle_dir / "thsr_ocr" / "thsr_prediction_model_250827.keras")
+        else:
+            # Running in development
+            sys.path.append(str(Path(__file__).parent.parent / "thsr_ocr"))
+            model_path = str(Path(__file__).parent.parent / "thsr_ocr" / "thsr_prediction_model_250827.keras")
+        
+        if not os.path.exists(model_path):
+            print("[ OCR model not found ]")
+            return None
+        
+        from test_model import CaptchaModelTester
+        _ocr_model_cache = CaptchaModelTester(model_path)
+        return _ocr_model_cache
+        
+    except Exception as e:
+        print(f"[ OCR model initialization failed: {e} ]")
+        return None
+
+
+def _try_ocr_captcha(img_bytes: bytes, max_attempts: int = 3) -> Optional[str]:
+    """Try to recognize captcha using OCR model with retry mechanism."""
+    try:
+        # Get cached model instance
+        tester = _get_ocr_model()
+        if tester is None:
+            return None
+        
+        # Import image processor
         if getattr(sys, 'frozen', False):
             # Running in PyInstaller bundle
             bundle_dir = Path(sys._MEIPASS)
@@ -860,7 +900,6 @@ def _try_ocr_captcha(img_bytes: bytes, max_attempts: int = 3) -> Optional[str]:
             # Running in development
             sys.path.append(str(Path(__file__).parent.parent / "thsr_ocr"))
         
-        from test_model import CaptchaModelTester
         from datasets.image_processor import process_image
         
         # Create temporary file for the captcha image
@@ -869,22 +908,6 @@ def _try_ocr_captcha(img_bytes: bytes, max_attempts: int = 3) -> Optional[str]:
             temp_image_path = temp_file.name
         
         try:
-            # Initialize OCR model
-            # Handle both development and PyInstaller bundled environments
-            if getattr(sys, 'frozen', False):
-                # Running in PyInstaller bundle
-                bundle_dir = Path(sys._MEIPASS)
-                model_path = str(bundle_dir / "thsr_ocr" / "thsr_prediction_model_250827.keras")
-            else:
-                # Running in development
-                model_path = str(Path(__file__).parent.parent / "thsr_ocr" / "thsr_prediction_model_250827.keras")
-            if not os.path.exists(model_path):
-                print("[ OCR model not found, falling back to manual input ]")
-                return None
-            
-            # print("Loading OCR model...")
-            tester = CaptchaModelTester(model_path)
-            
             for attempt in range(max_attempts):
                 try:
                     if attempt == 0:

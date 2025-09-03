@@ -2,23 +2,24 @@ services:
   # Original CLI service for interactive usage
   thsr-sniper:
     build: .
-    image: seanchangx/thsr-sniper:dev
+    image: seanchangx/thsr-sniper:latest
     container_name: thsr-sniper
     environment:
       - PYTHONUNBUFFERED=1
       - DISPLAY=${DISPLAY:-:0}
       - TERM=xterm-256color
       - THSR_FORCE_INTERACTIVE=1  # Force interactive mode for pure CLI usage
-    network_mode: host
     stdin_open: true
     tty: true
     command: bash
     restart: unless-stopped
+    networks:
+      - default
 
   # Background scheduler service
   thsr-sniper-scheduler:
     build: .
-    image: seanchangx/thsr-sniper:dev
+    image: seanchangx/thsr-sniper:latest
     container_name: thsr-sniper-scheduler
     volumes:
       - data:/app/data
@@ -33,7 +34,7 @@ services:
   # THSR Booking API service
   thsr-sniper-api:
     build: .
-    image: seanchangx/thsr-sniper:dev
+    image: seanchangx/thsr-sniper:latest
     container_name: thsr-sniper-api
     ports:
       - "8000:8000"

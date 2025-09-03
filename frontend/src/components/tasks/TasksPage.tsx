@@ -41,7 +41,7 @@ const TasksPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
 
-  // Fetch tasks
+  // Fetch tasks with improved error handling
   const { data: tasksData, isLoading, refetch } = useQuery(
     ['tasks', selectedStatus],
     () => thsrApi.getResults({
@@ -51,14 +51,26 @@ const TasksPage: React.FC = () => {
     { 
       refetchInterval: 5000,
       onError: (error: any) => {
-        if (error.response?.status === 401) {
-          console.log('Authentication required for task management');
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          console.log('Authentication error in tasks query');
+          // Error will be handled by global query client
         }
       }
     }
   );
 
-  const { data: stations = [] } = useQuery('stations', thsrApi.getStations);
+  const { data: stations = [] } = useQuery(
+    'stations', 
+    thsrApi.getStations,
+    {
+      onError: (error: any) => {
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          console.log('Authentication error in stations query');
+          // Error will be handled by global query client
+        }
+      }
+    }
+  );
 
   // Cancel task mutation
   const cancelTaskMutation = useMutation(thsrApi.cancelTask, {

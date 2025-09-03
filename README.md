@@ -37,9 +37,7 @@ For production use with optimized builds:
 docker compose up -d
 
 # Services will be available at:
-# - Frontend (production): http://localhost:3000
-# - API server: http://localhost:8000
-# - Auth service: http://localhost:8001
+# - Frontend:   http://localhost:3000 [ Production ]
 ```
 
 #### Development Environment
@@ -49,9 +47,11 @@ For frontend development with hot reload:
 docker compose -f docker-compose.dev.yml up -d
 
 # Services will be available at:
-# - Frontend (development): http://localhost:5173 (with hot reload)
-# - API server: http://localhost:8000
-# - Auth service: http://localhost:8001
+# - Frontend:         http://localhost:5173 [ Vite Dev Server ]
+# - API server:       http://localhost:8000
+# - Auth service:     http://localhost:8001
+# - MySQL database:   http://localhost:3306
+# - phpMyAdmin:       http://localhost:8080
 ```
 
 
@@ -90,7 +90,7 @@ docker compose exec thsr-sniper python main.py --cancel-task TASK_ID
 RESTful API for integration and web interfaces:
 ```bash
 # Start only the API server
-docker compose up -d api
+docker compose up -d thsr-sniper-api
 
 # API will be available at http://localhost:8000
 # Documentation at http://localhost:8000/docs
@@ -167,30 +167,53 @@ The system provides 38 time slots throughout the day, from 00:01 to 23:30. Use `
 
 ## Docker Services
 
-The system consists of three Docker services:
+The system consists of multiple Docker services for a comprehensive architecture:
 
-### `thsr-sniper` (Main CLI)
+### Core Services
+
+#### `thsr-sniper` (Main CLI)
 Interactive CLI for immediate booking and task management:
 ```bash
 docker compose run --rm thsr-sniper python main.py [options]
 ```
 
-### `api` (RESTful API Server)
+#### `thsr-sniper-api` (RESTful API Server)
 Web API server with OpenAPI documentation:
 ```bash
-docker compose up -d api
+docker compose up -d thsr-sniper-api
 # API: http://localhost:8000
 # Docs: http://localhost:8000/docs
 ```
 
-### `scheduler` (Background Watchdog)
+#### `thsr-sniper-scheduler` (Background Watchdog)
 Monitors and executes scheduled booking tasks:
 ```bash
-docker compose up -d scheduler
+docker compose up -d thsr-sniper-scheduler
 # Automatically manages periodic booking attempts
 ```
 
 ## API Endpoints
+
+### Authentication
+
+The REST API requires Bearer token authentication for external access:
+
+```bash
+# 1. Obtain JWT token from auth service
+curl -X POST "http://localhost:8001/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "user", "password": "your_password"}'
+
+# 2. Use token in API requests
+curl -X GET "http://localhost:8000/tasks" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+**Note**: CLI operations automatically bypass authentication when running inside Docker containers for internal access.
+
+### API Documentation
+- **Interactive API Docs**: http://localhost:8000/docs
+- **Auth Service Docs**: http://localhost:8001/docs
 
 The REST API provides programmatic access to all booking features:
 
@@ -343,52 +366,90 @@ python view_results.py --details
 python view_results.py --task-id abc12345-...
 ```
 
-## Development
-
-### Project Structure
+## Project Structure
 ```
-THSR-Sniper/
-├── thsr_py/                 # Core Python package
-│   ├── __init__.py          # Package initialization with all modules
-│   ├── api.py               # FastAPI server with RESTful endpoints
-│   ├── api_client.py        # API client for CLI task management
-│   ├── cli.py               # Command line interface with modern banner
-│   ├── flows.py             # Main booking logic and automation flow
-│   ├── scheduler.py         # Task scheduling and execution engine
-│   ├── schema.py            # Data models and constants
-│   └── watchdog.py          # Background service monitoring
-├── thsr_ocr/                # OCR module for captcha recognition
-│   ├── captcha_ocr.py       # Captcha OCR training pipeline
-│   ├── download_captcha.py  # Download captcha images
-│   ├── prediction_model.py  # Convert full model to prediction-only
-│   ├── test_model.py        # Test OCR recognition accuracy
-│   ├── datasets/            # Image processing and dataset tools
-│   │   ├── image_processor.py # Image preprocessing utilities
-│   │   ├── label_*.sh       # Dataset management scripts
-│   │   └── 20250825*/       # Training datasets
-│   └── *.keras              # Trained OCR models
-├── main.py                  # Main entry point and mode router
-├── watchdog.py              # Standalone watchdog service
-├── view_results.py          # Results viewer and analytics tool
-├── requirements.txt         # Python dependencies
-├── docker-compose.yml       # Multi-service Docker configuration
-├── Dockerfile               # Container definition with all dependencies
-└── README.md                # This comprehensive documentation
-```
-
-### Local Development
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run locally (immediate booking)
-python main.py --help
-
-# Start API server locally
-python main.py --start-api
-
-# Run watchdog service locally
-python watchdog.py
+THSR-Sniper/                    # Autonomous Taiwan High Speed Rail Booking System
+├── 🐳 Docker Services
+│   ├── docker-compose.yml      # Production multi-service configuration
+│   ├── docker-compose.dev.yml  # Development environment with hot reload
+│   └── Dockerfile              # Main application container definition
+│
+├── 🧠 Core Application (thsr_py/)
+│   ├── __init__.py             # Package initialization with all modules
+│   ├── api.py                  # FastAPI server with authenticated endpoints
+│   ├── api_client.py           # API client with auto-Docker detection
+│   ├── cli.py                  # Command line interface with modern banner
+│   ├── flows.py                # Main booking logic and automation flow
+│   ├── scheduler.py            # Intelligent task scheduling engine
+│   ├── schema.py               # Data models and constants (stations/times)
+│   └── watchdog.py             # Background service monitoring
+│
+├── 🛡️ Authentication Service (auth_service/)
+│   ├── auth_api.py             # JWT authentication API server
+│   ├── database.py             # MySQL user management
+│   ├── security.py             # Password hashing and token validation
+│   ├── requirements.txt        # Auth service dependencies
+│   ├── Dockerfile              # Auth service container
+│   └── data/                   # Database initialization scripts
+│
+├── 🎨 Frontend Interface (frontend/)
+│   ├── src/                    # React + TypeScript source code
+│   │   ├── components/         # UI components organized by feature
+│   │   │   ├── Dashboard.tsx   # Main dashboard with stats and quick actions
+│   │   │   ├── Layout.tsx      # App layout with navigation and auth
+│   │   │   ├── auth/           # Authentication components (Login, Register)
+│   │   │   ├── booking/        # Booking form and management components
+│   │   │   ├── profile/        # User profile management
+│   │   │   ├── tasks/          # Task monitoring and management
+│   │   │   └── ui/             # Reusable UI components (Spinner, Notifications)
+│   │   ├── services/           # API integration layer
+│   │   │   └── api.ts          # API client with auth and endpoints
+│   │   ├── store/              # State management (Zustand)
+│   │   │   └── authStore.ts    # Authentication state management
+│   │   ├── types/              # TypeScript type definitions
+│   │   │   └── index.ts        # Shared interface definitions
+│   │   ├── utils/              # Utility functions and helpers
+│   │   │   ├── dateTime.ts     # Date formatting and timezone handling
+│   │   │   └── stations.ts     # Station mapping and route formatting
+│   │   ├── App.tsx             # Main app component with routing
+│   │   ├── main.tsx            # Application entry point
+│   │   ├── index.css           # Global styles with ROG gaming theme
+│   │   └── vite-env.d.ts       # Vite environment type definitions
+│   ├── public/                 # Static assets
+│   ├── package.json            # Node.js dependencies and scripts
+│   ├── vite.config.ts          # Vite build configuration with proxy
+│   ├── tailwind.config.js      # Tailwind CSS with custom ROG theme
+│   ├── postcss.config.js       # PostCSS configuration for Tailwind
+│   ├── tsconfig.json           # TypeScript configuration
+│   ├── tsconfig.node.json      # Node.js TypeScript configuration
+│   ├── index.html              # HTML entry point with meta tags
+│   ├── nginx.conf              # Production nginx configuration
+│   ├── Dockerfile              # Production build container
+│   ├── Dockerfile.dev          # Development container with hot reload
+│   ├── .dockerignore           # Docker build exclusions
+│   └── env.example             # Environment variables template
+│
+├── 🧠 ML Captcha Recognition (thsr_ocr/)
+│   ├── captcha_ocr.py          # CNN+LSTM+CTC model training
+│   ├── download_captcha.py     # Captcha image downloader
+│   ├── prediction_model.py     # Optimized inference-only model
+│   ├── test_model.py           # Accuracy testing and validation
+│   ├── datasets/               # Training data and preprocessing
+│   └── *.keras                 # Trained model files (95%+ accuracy)
+│
+├── 📊 Results & Analytics
+│   ├── view_results_direct.py  # Direct database results viewer
+│   ├── view_results.sh         # Enhanced Docker wrapper with auth
+│   ├── main.py                 # Main entry point and CLI router
+│   └── generate_keys.py        # Encryption key generator
+│
+├── 📁 Assets & Documentation  
+│   ├── assets/                 # Project logos and branding
+│   │   └── thsr-sniper-logo.svg
+│   ├── README.md               # Comprehensive documentation
+│   ├── requirements.txt        # Main Python dependencies
+│   ├── LICENSE                 # MIT License
+│   └── env.example             # Environment variables template
 ```
 
 ## Technical Details
