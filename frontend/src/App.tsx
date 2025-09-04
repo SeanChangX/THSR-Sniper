@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from 'react-query';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
+import VersionChecker from '@/components/VersionChecker';
 
 // Components
 import Layout from '@/components/Layout';
@@ -43,6 +44,8 @@ const App: React.FC = () => {
   const { isAuthenticated, setUser, logout, token } = useAuthStore();
   const queryClient = useQueryClient();
 
+  // Version check is now handled by VersionChecker component
+
   // Global authentication failure handler
   useEffect(() => {
     const handleAuthLogout = () => {
@@ -59,36 +62,35 @@ const App: React.FC = () => {
     };
   }, [logout, queryClient]);
 
-  // Session validation on app start
+  // Session validation on app start - simplified logic
   useEffect(() => {
     const validateSession = async () => {
-      // Check if we have a token but no user data
+      // Only clear stale data if we have tokens but are not authenticated
       const hasToken = !!localStorage.getItem('auth_token') || !!token;
       const hasAuthStorage = !!localStorage.getItem('auth-storage');
       
-      if (hasToken || hasAuthStorage) {
-        // If we have tokens but not authenticated, clear everything
-        if (!isAuthenticated) {
-          console.log('Found stale session data, clearing...');
-          queryClient.clear();
-          localStorage.removeItem('auth-storage');
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('refresh_token');
-          localStorage.removeItem('notificationHistory');
-        }
+      if ((hasToken || hasAuthStorage) && !isAuthenticated) {
+        console.log('Found stale session data, clearing...');
+        queryClient.clear();
+        localStorage.removeItem('auth-storage');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('notificationHistory');
       }
     };
 
+    // Only run validation once on mount
     validateSession();
-  }, [isAuthenticated, token, queryClient]);
+  }, []); // Remove dependencies to prevent infinite loops
 
   // Auto-fetch user data if authenticated
-  const { isLoading } = useQuery(
+  const { isLoading, isError } = useQuery(
     'currentUser',
     authApi.getCurrentUser,
     {
       enabled: isAuthenticated && !!token,
       retry: false,
+      staleTime: 0, // Always fetch fresh data
       onSuccess: (user) => {
         setUser(user);
       },
@@ -105,8 +107,9 @@ const App: React.FC = () => {
     }
   );
 
-  // Show loading spinner while checking authentication
-  if (isAuthenticated && isLoading) {
+  // Show loading spinner only when we have a token and are fetching user data
+  // Don't show loading if there's an error or if we're not authenticated
+  if (isAuthenticated && !!token && isLoading && !isError) {
     return (
       <div className="min-h-screen bg-bg-primary flex items-center justify-center">
         <LoadingSpinner size="large" />
@@ -116,6 +119,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-bg-primary">
+      <VersionChecker />
       <Routes>
         {/* Public Routes */}
         <Route 

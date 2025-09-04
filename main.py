@@ -48,7 +48,7 @@ def _preload_ocr_if_needed(args) -> None:
                 # Initialize model (this takes the most time)
                 tester = CaptchaModelTester(model_path)
                 
-                print(f"OCR Model Loaded")
+                # print(f"OCR Model Loaded")
             else:
                 print("OCR Model Not Found, Falling Back to Manual Input")
 
