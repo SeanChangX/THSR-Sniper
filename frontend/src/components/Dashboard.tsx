@@ -6,6 +6,13 @@ import { useAuthStore } from '@/store/authStore';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { formatStationRoute } from '@/utils/stations';
 
+// Helper function to clean ANSI color codes from PNR
+const cleanPNR = (pnr: string | null | undefined): string => {
+  if (!pnr) return '未知';
+  // Remove ANSI color codes (e.g., \u001b[38;5;46m04349325\u001b[0m)
+  return pnr.replace(/\u001b\[[0-9;]*m/g, '').trim();
+};
+
 const Dashboard: React.FC = () => {
   const { user } = useAuthStore();
 
@@ -293,7 +300,7 @@ const Dashboard: React.FC = () => {
                   </p>
                   {task.status === 'success' && (task.result || (task as any).success_pnr) && (
                     <p className="text-text-muted text-xs">
-                      PNR: {task.result || (task as any).success_pnr}
+                      PNR: {cleanPNR(task.result || (task as any).success_pnr)}
                     </p>
                   )}
                 </div>

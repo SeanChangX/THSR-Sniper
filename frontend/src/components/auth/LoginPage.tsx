@@ -47,7 +47,7 @@ const LoginPage: React.FC = () => {
         setAuth(user, tokens);
         console.log('Set auth state');
         
-        toast.success('登入成功！');
+        toast.success('登入成功');
         
         // Redirect to intended page or dashboard
         const from = (location.state as any)?.from?.pathname || '/dashboard';

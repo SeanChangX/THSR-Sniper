@@ -10,6 +10,8 @@ import logging
 import threading
 import json
 from pathlib import Path
+import fcntl
+import os
 
 from .flows import run as run_booking_flow
 from .schema import STATION_MAP, TIME_TABLE, TicketType
@@ -22,6 +24,7 @@ class BookingStatus(Enum):
     FAILED = "failed"
     EXPIRED = "expired"
     CANCELLED = "cancelled"
+    DELETED = "deleted"
 
 
 @dataclass
@@ -183,7 +186,7 @@ class BookingScheduler:
             # Auto-detect storage location
             data_dir = Path("/app/data")
             if data_dir.exists():
-                # Running in Docker container
+                # Running in Docker container - use shared volume
                 storage_path = "/app/data/thsr_scheduler.json"
             else:
                 # Running locally - create .thsr directory in user's home
@@ -196,7 +199,9 @@ class BookingScheduler:
         self.running = False
         self.scheduler_thread: Optional[threading.Thread] = None
         self.logger = self._setup_logger()
-        self._last_file_mtime: Optional[float] = None  # Track file modification time
+        
+        # Initialize file modification time tracking
+        self._last_file_mtime: Optional[float] = None
         
         # Load existing tasks if persistence is enabled
         if self.enable_persistence:
@@ -236,18 +241,38 @@ class BookingScheduler:
         """Load tasks from storage file."""
         if not self.enable_persistence or not self.storage_path:
             return
-            
-        # Skip reload if file hasn't changed (unless forced)
-        if not force and not self._should_reload_tasks():
-            self.logger.debug("Skipping task reload - file unchanged")
+        
+        # If not forcing and we already have tasks, don't reload unless file changed
+        if not force and self.tasks and not self._should_reload_tasks():
             return
             
         if self.storage_path.exists():
+            # Use file locking to prevent concurrent access during read
+            lock_path = self.storage_path.with_suffix('.lock')
+            
+            # Try to acquire lock with timeout (shorter timeout for reads)
+            lock_acquired = False
+            lock_fd = None
+            for attempt in range(5):  # Try for up to 0.5 seconds
+                try:
+                    lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+                    lock_acquired = True
+                    break
+                except FileExistsError:
+                    time.sleep(0.1)  # Wait 100ms before retry
+            
             try:
+                # If we can't get lock, proceed without it (read operations are safer)
+                if not lock_acquired:
+                    self.logger.debug("Could not acquire read lock, proceeding anyway")
+                
                 # Check if file is empty
                 if self.storage_path.stat().st_size == 0:
                     self.logger.debug("Storage file is empty, starting with no tasks")
                     return
+                
+                # Clear existing tasks before loading
+                self.tasks.clear()
                 
                 with open(self.storage_path, 'r') as f:
                     content = f.read().strip()
@@ -274,11 +299,20 @@ class BookingScheduler:
                 self.logger.error(f"Failed to load tasks from storage: {e}")
                 import traceback
                 self.logger.debug(f"Load error traceback: {traceback.format_exc()}")
+            
+            finally:
+                # Always release lock if acquired
+                if lock_acquired and lock_fd is not None:
+                    try:
+                        os.close(lock_fd)
+                        lock_path.unlink()
+                    except:
+                        pass
         else:
             self.logger.debug(f"No storage file found at {self.storage_path}, starting with empty task list")
     
     def _save_tasks(self) -> None:
-        """Save tasks to storage file."""
+        """Save tasks to storage file with simplified locking."""
         if not self.enable_persistence or not self.storage_path:
             return
             
@@ -293,18 +327,40 @@ class BookingScheduler:
             
             # Write to temporary file first, then move to final location (atomic write)
             temp_path = self.storage_path.with_suffix('.tmp')
-            with open(temp_path, 'w') as f:
-                json.dump(data, f, indent=2)
             
-            # Atomic move
-            temp_path.replace(self.storage_path)
+            # Simplified locking - try once, if fails, log warning but continue
+            lock_path = self.storage_path.with_suffix('.lock')
+            lock_acquired = False
             
-            # Update our tracked modification time
-            if self.storage_path.exists():
-                self._last_file_mtime = self.storage_path.stat().st_mtime
+            try:
+                lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+                lock_acquired = True
+            except FileExistsError:
+                self.logger.debug("File is locked by another process, skipping save")
+                return
+            
+            try:
+                with open(temp_path, 'w') as f:
+                    json.dump(data, f, indent=2)
                 
-            self.logger.debug(f"Tasks saved successfully to {self.storage_path}")
-            
+                # Atomic move
+                temp_path.replace(self.storage_path)
+                
+                # Update our tracked modification time
+                if self.storage_path.exists():
+                    self._last_file_mtime = self.storage_path.stat().st_mtime
+                    
+                self.logger.debug(f"Tasks saved successfully to {self.storage_path}")
+                
+            finally:
+                # Always release lock
+                if lock_acquired:
+                    try:
+                        os.close(lock_fd)
+                        lock_path.unlink()
+                    except:
+                        pass
+                    
         except Exception as e:
             self.logger.error(f"Failed to save tasks to storage: {e}")
             import traceback
@@ -322,20 +378,29 @@ class BookingScheduler:
     
     def get_task(self, task_id: str) -> Optional[BookingTask]:
         """Get a specific task by ID."""
-        # Smart reload: only reload if file has changed
-        self._load_tasks()
+        # Only reload if we don't have the task in memory
+        if task_id not in self.tasks:
+            self._load_tasks()
         return self.tasks.get(task_id)
     
-    def list_tasks(self) -> List[BookingTask]:
-        """List all tasks."""
-        # Smart reload: only reload if file has changed
-        self._load_tasks()
-        return list(self.tasks.values())
+    def list_tasks(self, force_reload: bool = False, include_deleted: bool = False) -> List[BookingTask]:
+        """List all tasks, optionally excluding deleted tasks."""
+        # Only reload if we have no tasks in memory, to avoid overwriting
+        if not self.tasks or force_reload:
+            self._load_tasks()
+        
+        tasks = list(self.tasks.values())
+        
+        # Filter out deleted tasks unless specifically requested
+        if not include_deleted:
+            tasks = [task for task in tasks if task.status != BookingStatus.DELETED]
+        
+        return tasks
     
     def cancel_task(self, task_id: str, user_id: Optional[str] = None) -> bool:
         """Cancel a specific task."""
-        # Force reload to get latest state for critical operations
-        self._load_tasks(force=True)
+        # Reload to get latest state
+        self._load_tasks()
         if task_id in self.tasks:
             task = self.tasks[task_id]
             
@@ -351,9 +416,9 @@ class BookingScheduler:
         return False
     
     def remove_task(self, task_id: str, user_id: Optional[str] = None) -> bool:
-        """Remove a task completely."""
-        # Force reload to get latest state for critical operations
-        self._load_tasks(force=True)
+        """Mark a task as deleted instead of removing it completely."""
+        # Reload to get latest state
+        self._load_tasks()
         if task_id in self.tasks:
             task = self.tasks[task_id]
             
@@ -362,9 +427,10 @@ class BookingScheduler:
                 self.logger.warning(f"User {user_id} attempted to remove task {task_id} owned by {task.user_id}")
                 return False
             
-            del self.tasks[task_id]
+            # Mark as deleted instead of removing
+            task.status = BookingStatus.DELETED
             self._save_tasks()
-            self.logger.info(f"Removed task: {task_id}")
+            self.logger.info(f"Marked task as deleted: {task_id}")
             return True
         return False
     
@@ -400,11 +466,8 @@ class BookingScheduler:
         """Process all pending tasks."""
         current_time = datetime.now(timezone.utc)
         
-        # Smart reload: only reload if file has changed
-        self._load_tasks()
-        
         for task in list(self.tasks.values()):
-            if task.status in [BookingStatus.SUCCESS, BookingStatus.CANCELLED]:
+            if task.status in [BookingStatus.SUCCESS, BookingStatus.CANCELLED, BookingStatus.DELETED]:
                 continue
             
             # Check if task is expired
@@ -435,6 +498,72 @@ class BookingScheduler:
             if should_run:
                 self._execute_booking_task(task)
         
+        # Periodically clean up old deleted tasks (every hour)
+        self._cleanup_deleted_tasks(current_time)
+        
+        # Only save if there were any changes in this cycle
+        # _execute_booking_task already saves its changes, so we don't need to save again
+        # This prevents unnecessary merge conflicts
+        # self._save_tasks_safe()  # Commented out to prevent SUCCESS status overwrites
+    
+    def _cleanup_deleted_tasks(self, current_time: datetime) -> None:
+        """Clean up tasks that have been marked as deleted for more than 1 hour."""
+        if not hasattr(self, '_last_cleanup_time'):
+            self._last_cleanup_time = current_time
+            return
+        
+        # Only run cleanup once per hour
+        if current_time - self._last_cleanup_time < timedelta(hours=1):
+            return
+        
+        self._last_cleanup_time = current_time
+        
+        # Remove tasks that have been deleted for more than 1 hour
+        deleted_cutoff = current_time - timedelta(hours=1)
+        tasks_to_remove = []
+        
+        for task_id, task in self.tasks.items():
+            if (task.status == BookingStatus.DELETED and 
+                task.last_attempt and task.last_attempt < deleted_cutoff):
+                tasks_to_remove.append(task_id)
+        
+        for task_id in tasks_to_remove:
+            del self.tasks[task_id]
+            self.logger.debug(f"Permanently removed deleted task: {task_id}")
+        
+        if tasks_to_remove:
+            self.logger.info(f"Cleaned up {len(tasks_to_remove)} old deleted tasks")
+    
+    def _save_tasks_safe(self) -> None:
+        """Save tasks with conflict detection."""
+        if not self.enable_persistence or not self.storage_path:
+            return
+            
+        # Check if file was modified by another process since our last load
+        if self._should_reload_tasks():
+            self.logger.debug("File was modified by another process, merging changes before save")
+            # Load the latest state
+            current_tasks = dict(self.tasks)  # Save our current state
+            self._load_tasks(force=True)      # Load latest from file
+            
+            # Merge our changes back - prioritize completed tasks and recent updates
+            for task_id, task in current_tasks.items():
+                if task_id in self.tasks:
+                    existing_task = self.tasks[task_id]
+                    
+                    # ALWAYS preserve completed tasks (SUCCESS, CANCELLED, DELETED)
+                    if task.status in [BookingStatus.SUCCESS, BookingStatus.CANCELLED, BookingStatus.DELETED]:
+                        self.tasks[task_id] = task
+                        self.logger.debug(f"Preserved completed task {task_id} status: {task.status.value}")
+                    # For other tasks, keep our version if it's more recent or has more attempts
+                    elif (task.last_attempt and existing_task.last_attempt and 
+                        task.last_attempt > existing_task.last_attempt) or \
+                       task.attempts > existing_task.attempts:
+                        self.tasks[task_id] = task
+                else:
+                    # Add new task that doesn't exist in file
+                    self.tasks[task_id] = task
+        
         self._save_tasks()
     
     def _execute_booking_task(self, task: BookingTask) -> None:
@@ -456,6 +585,9 @@ class BookingScheduler:
             self._save_tasks()
         except Exception as save_error:
             self.logger.error(f"Failed to save task state before execution: {save_error}")
+
+        # Store environment variable for restoration
+        original_non_interactive = None
         
         try:
             # Convert task to args namespace
@@ -475,59 +607,58 @@ class BookingScheduler:
             stdout_buffer = io.StringIO()
             stderr_buffer = io.StringIO()
             
-            try:
-                # Redirect stdout and stderr to capture output
-                with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
-                    run_booking_flow(args)
+            # Redirect stdout and stderr to capture output
+            with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
+                run_booking_flow(args)
+            
+            # Check if booking was successful by looking for PNR in output
+            output = stdout_buffer.getvalue()
+            stderr_output = stderr_buffer.getvalue()
+            
+            self.logger.debug(f"Task {task.id} output length: stdout={len(output)}, stderr={len(stderr_output)}")
+            
+            if "PNR Code:" in output:
+                # Extract PNR code
+                lines = output.split('\n')
+                for line in lines:
+                    if "PNR Code:" in line:
+                        pnr = line.split("PNR Code:")[-1].strip()
+                        # Clean ANSI color codes from PNR
+                        import re
+                        pnr = re.sub(r'\033\[[0-9;]*m', '', pnr).strip()
+                        task.success_pnr = pnr
+                        break
                 
-                # Check if booking was successful by looking for PNR in output
-                output = stdout_buffer.getvalue()
-                stderr_output = stderr_buffer.getvalue()
-                
-                self.logger.debug(f"Task {task.id} output length: stdout={len(output)}, stderr={len(stderr_output)}")
-                
-                if "PNR Code:" in output:
-                    # Extract PNR code
-                    lines = output.split('\n')
-                    for line in lines:
-                        if "PNR Code:" in line:
-                            pnr = line.split("PNR Code:")[-1].strip()
-                            task.success_pnr = pnr
-                            break
-                    
-                    task.status = BookingStatus.SUCCESS
-                    self.logger.info(f"Task {task.id} completed successfully! PNR: {task.success_pnr}")
-                else:
-                    # Check for error messages in output
-                    if stderr_output:
-                        task.error_message = stderr_output.strip()[:500]  # Limit error message length
-                    elif "Error" in output or "error" in output.lower():
-                        # Look for error patterns in stdout
-                        error_lines = [line for line in output.split('\n') if 'error' in line.lower() or 'Error' in line]
-                        if error_lines:
-                            task.error_message = '; '.join(error_lines[:3])[:500]
-                        else:
-                            task.error_message = "Booking failed - no PNR code found"
+                task.status = BookingStatus.SUCCESS
+                self.logger.info(f"Task {task.id} completed successfully! PNR: {task.success_pnr}")
+                self.logger.info(f"Task {task.id} STATUS SET TO SUCCESS - about to save...")
+            else:
+                # Check for error messages in output
+                if stderr_output:
+                    task.error_message = stderr_output.strip()[:500]  # Limit error message length
+                elif "Error" in output or "error" in output.lower():
+                    # Look for error patterns in stdout
+                    error_lines = [line for line in output.split('\n') if 'error' in line.lower() or 'Error' in line]
+                    if error_lines:
+                        task.error_message = '; '.join(error_lines[:3])[:500]
                     else:
                         task.error_message = "Booking failed - no PNR code found"
-                    
+                else:
+                    task.error_message = "Booking failed - no PNR code found"
+                
+                # Only set to PENDING if task is not already SUCCESS (shouldn't happen but safety check)
+                if task.status != BookingStatus.SUCCESS:
                     task.status = BookingStatus.PENDING  # Will retry on next cycle
-                    self.logger.warning(f"Task {task.id} attempt {task.attempts} failed: {task.error_message}")
+                self.logger.warning(f"Task {task.id} attempt {task.attempts} failed: {task.error_message}")
             
-            except Exception as e:
+        except Exception as e:
+            # Only override status if it's not already SUCCESS
+            if task.status != BookingStatus.SUCCESS:
                 task.error_message = f"Booking execution error: {str(e)}"[:500]
                 task.status = BookingStatus.PENDING  # Will retry on next cycle
-                self.logger.error(f"Task {task.id} failed with booking exception: {e}")
-                import traceback
-                self.logger.debug(f"Task {task.id} traceback: {traceback.format_exc()}")
-        
-        except Exception as e:
-            # Critical error - restore original state except for attempt count
-            task.status = BookingStatus.PENDING
-            task.error_message = f"Critical execution error: {str(e)}"[:500]
-            self.logger.error(f"Critical failure in task {task.id}: {e}")
+            self.logger.error(f"Task {task.id} failed with exception: {e}")
             import traceback
-            self.logger.debug(f"Critical error traceback: {traceback.format_exc()}")
+            self.logger.debug(f"Task {task.id} traceback: {traceback.format_exc()}")
         
         finally:
             # Restore original environment variable
@@ -538,8 +669,10 @@ class BookingScheduler:
                 
             # Always save the final state
             try:
+                self.logger.info(f"Task {task.id} FINAL SAVE - status={task.status.value}, pnr={task.success_pnr}")
+                # Save the task state
                 self._save_tasks()
-                self.logger.debug(f"Task {task.id} final state saved: status={task.status.value}, attempts={task.attempts}")
+                self.logger.info(f"Task {task.id} SAVE COMPLETED - status={task.status.value}, attempts={task.attempts}")
             except Exception as save_error:
                 self.logger.error(f"Failed to save task state after execution: {save_error}")
 
@@ -552,8 +685,21 @@ def get_scheduler() -> BookingScheduler:
     """Get or create the global scheduler instance."""
     global _scheduler_instance
     if _scheduler_instance is None:
-        _scheduler_instance = BookingScheduler()
-        # Tasks are already loaded in __init__
+        # Check if we're running in the API service
+        # API service should only read, not write to avoid conflicts
+        import os
+        is_api_service = os.environ.get('THSR_API_MODE') == '1'
+        
+        if is_api_service:
+            # API service uses read-write mode with shared storage
+            _scheduler_instance = BookingScheduler(enable_persistence=True)
+            # Load tasks from shared storage
+            _scheduler_instance._load_tasks(force=True)
+        else:
+            # Normal scheduler service with full read/write
+            _scheduler_instance = BookingScheduler()
+        
+        # Tasks are already loaded in __init__ or above
     # Don't reload automatically - let individual methods decide
     return _scheduler_instance
 

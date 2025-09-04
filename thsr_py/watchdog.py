@@ -170,20 +170,8 @@ class SchedulerWatchdog:
                 status_counts[status.value] = count
         
         # Find recent activity
-        recent_cutoff = datetime.now() - timedelta(hours=1)
-        # Ensure timezone compatibility for comparison
-        recent_tasks = []
-        for t in tasks:
-            if t.last_attempt:
-                task_last_attempt = t.last_attempt
-                # Make timezone-aware if needed
-                if task_last_attempt.tzinfo is None:
-                    task_last_attempt = task_last_attempt.replace(tzinfo=timezone.utc)
-                # Make cutoff timezone-aware 
-                if recent_cutoff.tzinfo is None:
-                    recent_cutoff = recent_cutoff.replace(tzinfo=timezone.utc)
-                if task_last_attempt > recent_cutoff:
-                    recent_tasks.append(t)
+        recent_cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+        recent_tasks = [t for t in tasks if t.last_attempt and t.last_attempt > recent_cutoff]
         
         self.logger.info(f"Status Report - Total: {len(tasks)}, Status: {status_counts}, Recent activity: {len(recent_tasks)} tasks")
         

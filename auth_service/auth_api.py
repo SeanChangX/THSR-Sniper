@@ -22,8 +22,8 @@ init_database()
 
 # Create FastAPI app
 app = FastAPI(
-    title="THSR Sniper Auth Service",
-    description="Authentication and user management service for THSR Sniper",
+    title="THSR-Sniper Auth Service",
+    description="Authentication and user management service for THSR-Sniper",
     version="1.0.0"
 )
 

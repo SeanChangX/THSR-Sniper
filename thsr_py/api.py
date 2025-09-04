@@ -16,6 +16,14 @@ from .scheduler import (
 from .schema import STATION_MAP, TIME_TABLE
 from .flows import run as run_booking_flow
 
+# Utility function to clean ANSI color codes
+def clean_ansi_codes(text: Optional[str]) -> Optional[str]:
+    """Remove ANSI color codes from text."""
+    if not text:
+        return text
+    import re
+    return re.sub(r'\033\[[0-9;]*m', '', text).strip()
+
 # Authentication dependency
 async def get_current_user(authorization: str = Header(None), x_internal_cli: str = Header(None)) -> Optional[str]:
     """Extract user ID from authorization header or allow CLI internal access."""
@@ -361,7 +369,7 @@ async def list_tasks(current_user_id: Optional[str] = Depends(get_current_user))
         raise HTTPException(status_code=401, detail="Authentication required to access tasks")
     
     scheduler = get_scheduler()
-    tasks = scheduler.list_tasks()
+    tasks = scheduler.list_tasks(force_reload=False)
     
     # CLI internal access sees all tasks, regular users see only their own
     if current_user_id != "cli-internal":
@@ -384,7 +392,7 @@ async def list_tasks(current_user_id: Optional[str] = Depends(get_current_user))
             interval_minutes=task.interval_minutes,
             attempts=task.attempts,
             last_attempt=task.last_attempt.isoformat() if task.last_attempt else None,
-            success_pnr=task.success_pnr,
+            success_pnr=clean_ansi_codes(task.success_pnr),
             error_message=task.error_message,
             created_at=task.created_at.isoformat()
         )
@@ -428,7 +436,7 @@ async def get_task_status(
         interval_minutes=task.interval_minutes,
         attempts=task.attempts,
         last_attempt=task.last_attempt.isoformat() if task.last_attempt else None,
-        success_pnr=task.success_pnr,
+        success_pnr=clean_ansi_codes(task.success_pnr),
         error_message=task.error_message,
         created_at=task.created_at.isoformat()
     )
@@ -500,7 +508,7 @@ async def remove_task(
 async def get_scheduler_status():
     """Get scheduler status information."""
     scheduler = get_scheduler()
-    tasks = scheduler.list_tasks()
+    tasks = scheduler.list_tasks(force_reload=False)
     
     status_counts = {}
     for status in BookingStatus:
@@ -637,7 +645,7 @@ async def get_results(
             raise HTTPException(status_code=401, detail="Authentication required to access tasks")
         
         scheduler = get_scheduler()
-        tasks = scheduler.list_tasks()
+        tasks = scheduler.list_tasks(force_reload=False)
         
         # Filter by user
         tasks = [task for task in tasks if task.user_id == current_user_id]
@@ -704,7 +712,7 @@ async def get_results_stats(current_user_id: Optional[str] = Depends(get_current
             raise HTTPException(status_code=401, detail="Authentication required to access task statistics")
         
         scheduler = get_scheduler()
-        tasks = scheduler.list_tasks()
+        tasks = scheduler.list_tasks(force_reload=False)
         
         # Filter by user
         tasks = [task for task in tasks if task.user_id == current_user_id]

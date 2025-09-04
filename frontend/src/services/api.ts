@@ -111,12 +111,16 @@ const addResponseInterceptor = (client: any) => {
         isRefreshing = true;
 
         try {
-          const refreshToken = localStorage.getItem('auth-storage')
-            ? JSON.parse(localStorage.getItem('auth-storage')!)?.state?.refreshToken
+          const authStorage = localStorage.getItem('auth-storage');
+          const refreshToken = authStorage
+            ? JSON.parse(authStorage)?.state?.refreshToken
             : null;
 
           if (!refreshToken) {
-            throw new Error('No refresh token available');
+            // Check if user was ever authenticated by looking for any auth data
+            const hasAuthData = authStorage && JSON.parse(authStorage)?.state;
+            const hadToken = hasAuthData?.token || hasAuthData?.user;
+            throw new Error(hadToken ? 'Session expired' : 'Authentication required');
           }
 
           const response = await authClient.post('/refresh', {
@@ -126,11 +130,11 @@ const addResponseInterceptor = (client: any) => {
           const newToken = response.data.access_token;
           
           // Update stored token
-          const authStorage = JSON.parse(localStorage.getItem('auth-storage') || '{}');
-          if (authStorage.state) {
-            authStorage.state.token = newToken;
-            authStorage.state.refreshToken = response.data.refresh_token;
-            localStorage.setItem('auth-storage', JSON.stringify(authStorage));
+          const parsedAuthStorage = JSON.parse(authStorage!);
+          if (parsedAuthStorage.state) {
+            parsedAuthStorage.state.token = newToken;
+            parsedAuthStorage.state.refreshToken = response.data.refresh_token;
+            localStorage.setItem('auth-storage', JSON.stringify(parsedAuthStorage));
             localStorage.setItem('auth_token', newToken);
           }
 
@@ -141,8 +145,24 @@ const addResponseInterceptor = (client: any) => {
         } catch (refreshError) {
           processQueue(refreshError, null);
           
-          // Force logout and redirect to login
-          console.log('Authentication failed, forcing logout...');
+          // Check error message to determine appropriate user feedback
+          const errorMessage = refreshError instanceof Error ? refreshError.message : 'Authentication failed';
+          
+          console.log('Refresh token failed:', {
+            error: refreshError,
+            errorMessage,
+            authStorage: localStorage.getItem('auth-storage')
+          });
+          
+          if (errorMessage === 'Authentication required') {
+            console.log('Authentication required for protected resource - silent redirect');
+            // Don't show toast for unauthenticated users, just redirect
+          } else {
+            console.log('Session expired, forcing logout...');
+            // Only show toast if user was actually authenticated
+            toast.error('Your session has expired. Please login again.');
+          }
+          
           handleAuthenticationFailure();
           
           return Promise.reject(refreshError);
@@ -153,8 +173,10 @@ const addResponseInterceptor = (client: any) => {
 
       // Handle other auth errors (403, etc.)
       if (error.response?.status === 403) {
-        console.log('Access forbidden, forcing logout...');
-        handleAuthenticationFailure();
+        console.log('Access forbidden - insufficient permissions');
+        toast.error('You do not have permission to access this resource.');
+        // Don't force logout for 403 - user is authenticated but lacks permission
+        return Promise.reject(error);
       }
 
       return Promise.reject(error);

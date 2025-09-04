@@ -15,6 +15,16 @@
 # and multi-service architecture with Docker deployment support.
 ```
 
+## Screenshots
+
+<div align="center">
+  <img src="docs/screenshots/login-page.png" alt="Login Page" width="45%">
+  <img src="docs/screenshots/dashboard.png" alt="Dashboard Overview" width="45%">
+  <br>
+  <img src="docs/screenshots/booking-form.png" alt="Booking Form" width="45%">
+  <img src="docs/screenshots/task-management.png" alt="Task Management" width="45%">
+</div>
+
 ## Quick Start
 
 ### Using Docker (Recommended)
@@ -194,23 +204,6 @@ docker compose up -d thsr-sniper-scheduler
 
 ## API Endpoints
 
-### Authentication
-
-The REST API requires Bearer token authentication for external access:
-
-```bash
-# 1. Obtain JWT token from auth service
-curl -X POST "http://localhost:8001/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{"username": "user", "password": "your_password"}'
-
-# 2. Use token in API requests
-curl -X GET "http://localhost:8000/tasks" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-```
-
-**Note**: CLI operations automatically bypass authentication when running inside Docker containers for internal access.
-
 ### API Documentation
 - **Interactive API Docs**: http://localhost:8000/docs
 - **Auth Service Docs**: http://localhost:8001/docs
@@ -326,23 +319,6 @@ curl -X POST "http://localhost:8000/schedule" \
   }'
 ```
 
-#### Get Task Status via API
-```bash
-curl "http://localhost:8000/tasks/abc12345-..."
-```
-
-#### View Results and Statistics
-```bash
-# Get all results
-curl "http://localhost:8000/results"
-
-# Get statistics
-curl "http://localhost:8000/results/stats"
-
-# Filter successful bookings
-curl "http://localhost:8000/results?status=success"
-```
-
 ### Information and Utilities
 
 #### View Available Options
@@ -357,13 +333,16 @@ docker compose run --rm thsr-sniper python main.py --times
 ### Results Viewer
 ```bash
 # View booking results
-python view_results.py
+./view_results.sh
 
 # View detailed results
-python view_results.py --details
+./view_results.sh --details
 
-# View specific task result
-python view_results.py --task-id abc12345-...
+# View specific user results
+./view_results.sh --user 1 --details
+
+# View successful bookings
+./view_results.sh --status success
 ```
 
 ## Project Structure

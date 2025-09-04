@@ -29,7 +29,7 @@ usage() {
     echo "Examples:"
     echo "  $0                          # Show task summary"
     echo "  $0 --details                # Show detailed information for all tasks"
-    echo "  $0 --task-id abc123         # Show specific task"
+    echo "  $0 --task-id af64...        # Show specific task"
     echo "  $0 --user 1 --details       # Show detailed tasks for user 1"
     echo "  $0 --status success         # Show only successful tasks"
     echo ""

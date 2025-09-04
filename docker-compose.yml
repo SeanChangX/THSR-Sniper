@@ -42,6 +42,7 @@ services:
       - data:/app/data
     environment:
       - PYTHONUNBUFFERED=1
+      - THSR_API_MODE=1
     restart: unless-stopped
     command: python main.py --start-api --api-host 0.0.0.0 --api-port 8000
     networks:
