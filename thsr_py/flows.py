@@ -90,9 +90,25 @@ def _print_section(title: str) -> None:
 
 
 def _headers() -> Dict[str, str]:
+    import random
+    import time
+    import uuid
+    
+    # Generate unique session-like identifiers for each request
+    session_id = f"{random.randint(100000, 999999)}_{int(time.time())}"
+    device_id = str(uuid.uuid4())[:8]
+    browser_version = f"137.{random.randint(0, 9)}"
+    
+    # Randomize some header values to simulate different users/devices
+    windows_versions = ["10.0", "11.0"]
+    firefox_versions = [f"137.{random.randint(0, 9)}", f"136.{random.randint(0, 9)}", f"138.{random.randint(0, 9)}"]
+    
+    selected_windows = random.choice(windows_versions)
+    selected_firefox = random.choice(firefox_versions)
+    
     return {
         "Host": "irs.thsrc.com.tw",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0",
+        "User-Agent": f"Mozilla/5.0 (Windows NT {selected_windows}; Win64; x64; rv:{selected_firefox}) Gecko/20100101 Firefox/{selected_firefox}",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
         "Accept-Language": "zh-TW,zh;q=0.8,en-US;q=0.5,en;q=0.3",
         "Accept-Encoding": "deflate, br",
@@ -101,11 +117,33 @@ def _headers() -> Dict[str, str]:
         "Referer": "https://irs.thsrc.com.tw/IMINT/",
         "Sec-Fetch-Site": "same-origin",
         "Sec-Fetch-Mode": "no-cors",
+        # Add session-like headers to make each request appear unique
+        "X-Requested-With": "XMLHttpRequest",
+        "X-Session-ID": session_id,
+        "X-Device-ID": device_id,
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
     }
 
 
 def _get_input(prompt: str, default, choices: Optional[List] = None) -> any:
     """Get user input with modern formatting and validation."""
+    import sys
+    import os
+    
+    # Check if running in non-interactive mode (API calls or scheduled tasks)
+    # Environment variable THSR_NON_INTERACTIVE can be set to force non-interactive mode
+    is_non_interactive = (
+        os.environ.get('THSR_NON_INTERACTIVE') == '1' or
+        os.environ.get('THSR_API_MODE') == '1' or
+        (not sys.stdin.isatty() and os.environ.get('THSR_FORCE_INTERACTIVE') != '1')
+    )
+    
+    if is_non_interactive:
+        print(f"\nAuto-selecting default for: {prompt}")
+        print(f"Using default value: {default}")
+        return default
+    
     if choices:
         print(f"\n{prompt}")
         # print(f"Available options: {', '.join(map(str, choices))}")
@@ -117,8 +155,9 @@ def _get_input(prompt: str, default, choices: Optional[List] = None) -> any:
     
     try:
         val = input("> ").strip()
-    except EOFError:
-        val = ""
+    except (EOFError, OSError):
+        print(f"No input available, using default: {default}")
+        return default
     
     if val == "":
         return default
@@ -243,22 +282,36 @@ def run(args) -> None:
     payload.select_time(getattr(args, "time", None))
 
     # Handle ticket selection logic properly
-    adult_cnt = getattr(args, "adult_cnt", None)
-    student_cnt = getattr(args, "student_cnt", None)
+    adult_cnt = getattr(args, "adult_cnt", None) or 0
+    student_cnt = getattr(args, "student_cnt", None) or 0
+    child_cnt = getattr(args, "child_cnt", None) or 0
+    senior_cnt = getattr(args, "senior_cnt", None) or 0
+    disabled_cnt = getattr(args, "disabled_cnt", None) or 0
     
-    if adult_cnt is None and student_cnt is None:
+    total_tickets = adult_cnt + student_cnt + child_cnt + senior_cnt + disabled_cnt
+    
+    if total_tickets == 0:
         # No tickets specified, default to 1 adult ticket
         payload.select_ticket_num(TicketType.Adult, None)
     else:
         # Tickets specified, use explicit counts
-        if adult_cnt is not None:
+        if adult_cnt > 0:
             payload.select_ticket_num(TicketType.Adult, adult_cnt)
-        elif student_cnt is not None:
-            # If only student tickets specified, set adult tickets to 0
+        elif total_tickets > 0:
+            # If no adult tickets but other types exist, explicitly set adult to 0
             payload.select_ticket_num(TicketType.Adult, 0)
         
-        if student_cnt is not None:
+        if student_cnt > 0:
             payload.select_ticket_num(TicketType.College, student_cnt)
+        
+        if child_cnt > 0:
+            payload.select_ticket_num(TicketType.Child, child_cnt)
+            
+        if senior_cnt > 0:
+            payload.select_ticket_num(TicketType.Elder, senior_cnt)
+            
+        if disabled_cnt > 0:
+            payload.select_ticket_num(TicketType.Disabled, disabled_cnt)
 
     payload.select_seat_prefer(getattr(args, "seat_prefer", None))
     payload.select_class_type(getattr(args, "class_type", None))
@@ -484,9 +537,26 @@ class _BookingPayload:
                 return
         
         # Fallback to manual input
-        print("\nEnter the security code from the captcha image:")
-        code = input("> ").strip()
-        self.security_code = code
+        import sys
+        import os
+        
+        is_non_interactive = (
+            os.environ.get('THSR_NON_INTERACTIVE') == '1' or
+            os.environ.get('THSR_API_MODE') == '1' or
+            (not sys.stdin.isatty() and os.environ.get('THSR_FORCE_INTERACTIVE') != '1')
+        )
+        
+        if is_non_interactive:
+            print("\nNo stdin available for captcha input, using empty string")
+            self.security_code = ""
+        else:
+            print("\nEnter the security code from the captcha image:")
+            try:
+                code = input("> ").strip()
+                self.security_code = code
+            except (EOFError, OSError):
+                print("No input available, using empty captcha code")
+                self.security_code = ""
 
 
 def _confirm_train_flow(session: requests.Session, soup: BeautifulSoup, train_index: Optional[int] = None) -> Optional[BeautifulSoup]:
@@ -629,8 +699,25 @@ class _ConfirmTicketPayload:
 
     def input_personal_id(self, personal_id: Optional[str]) -> str:
         if personal_id is None:
-            print("\nEnter your personal ID number:")
-            personal_id = input("> ").strip()
+            import sys
+            import os
+            
+            is_non_interactive = (
+                os.environ.get('THSR_NON_INTERACTIVE') == '1' or
+                os.environ.get('THSR_API_MODE') == '1' or
+                (not sys.stdin.isatty() and os.environ.get('THSR_FORCE_INTERACTIVE') != '1')
+            )
+            
+            if is_non_interactive:
+                print("\nNo stdin available, using empty personal ID")
+                personal_id = ""
+            else:
+                print("\nEnter your personal ID number:")
+                try:
+                    personal_id = input("> ").strip()
+                except (EOFError, OSError):
+                    print("No input available, using empty personal ID")
+                    personal_id = ""
         self.personal_id = personal_id.strip()
         return self.personal_id
 
@@ -755,16 +842,56 @@ def _show_result(soup: BeautifulSoup) -> None:
     print("   3. Enjoy your journey!")
 
 
-def _try_ocr_captcha(img_bytes: bytes, max_attempts: int = 3) -> Optional[str]:
-    """Try to recognize captcha using OCR model with retry mechanism."""
+# Global OCR model instance for reuse
+_ocr_model_cache = None
+
+
+def _get_ocr_model():
+    """Get cached OCR model instance, initialize if needed."""
+    global _ocr_model_cache
+    
+    if _ocr_model_cache is not None:
+        return _ocr_model_cache
+    
     try:
         # Suppress TensorFlow logging for cleaner output
         import logging
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TF messages
         logging.getLogger('tensorflow').setLevel(logging.ERROR)
         
-        # Try to import OCR dependencies
         # Handle both development and PyInstaller bundled environments
+        if getattr(sys, 'frozen', False):
+            # Running in PyInstaller bundle
+            bundle_dir = Path(sys._MEIPASS)
+            sys.path.append(str(bundle_dir / "thsr_ocr"))
+            model_path = str(bundle_dir / "thsr_ocr" / "thsr_prediction_model_250827.keras")
+        else:
+            # Running in development
+            sys.path.append(str(Path(__file__).parent.parent / "thsr_ocr"))
+            model_path = str(Path(__file__).parent.parent / "thsr_ocr" / "thsr_prediction_model_250827.keras")
+        
+        if not os.path.exists(model_path):
+            print("[ OCR model not found ]")
+            return None
+        
+        from test_model import CaptchaModelTester
+        _ocr_model_cache = CaptchaModelTester(model_path)
+        return _ocr_model_cache
+        
+    except Exception as e:
+        print(f"[ OCR model initialization failed: {e} ]")
+        return None
+
+
+def _try_ocr_captcha(img_bytes: bytes, max_attempts: int = 3) -> Optional[str]:
+    """Try to recognize captcha using OCR model with retry mechanism."""
+    try:
+        # Get cached model instance
+        tester = _get_ocr_model()
+        if tester is None:
+            return None
+        
+        # Import image processor
         if getattr(sys, 'frozen', False):
             # Running in PyInstaller bundle
             bundle_dir = Path(sys._MEIPASS)
@@ -773,7 +900,6 @@ def _try_ocr_captcha(img_bytes: bytes, max_attempts: int = 3) -> Optional[str]:
             # Running in development
             sys.path.append(str(Path(__file__).parent.parent / "thsr_ocr"))
         
-        from test_model import CaptchaModelTester
         from datasets.image_processor import process_image
         
         # Create temporary file for the captcha image
@@ -782,22 +908,6 @@ def _try_ocr_captcha(img_bytes: bytes, max_attempts: int = 3) -> Optional[str]:
             temp_image_path = temp_file.name
         
         try:
-            # Initialize OCR model
-            # Handle both development and PyInstaller bundled environments
-            if getattr(sys, 'frozen', False):
-                # Running in PyInstaller bundle
-                bundle_dir = Path(sys._MEIPASS)
-                model_path = str(bundle_dir / "thsr_ocr" / "thsr_prediction_model_250827.keras")
-            else:
-                # Running in development
-                model_path = str(Path(__file__).parent.parent / "thsr_ocr" / "thsr_prediction_model_250827.keras")
-            if not os.path.exists(model_path):
-                print("[ OCR model not found, falling back to manual input ]")
-                return None
-            
-            # print("Loading OCR model...")
-            tester = CaptchaModelTester(model_path)
-            
             for attempt in range(max_attempts):
                 try:
                     if attempt == 0:

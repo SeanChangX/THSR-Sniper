@@ -2,7 +2,7 @@ services:
   # Original CLI service for interactive usage
   thsr-sniper:
     build: .
-    image: seanchangx/thsr-sniper:latest
+    image: seanchangx/thsr-sniper:dev
     container_name: thsr-sniper
     environment:
       - PYTHONUNBUFFERED=1
@@ -19,7 +19,7 @@ services:
   # Background scheduler service
   thsr-sniper-scheduler:
     build: .
-    image: seanchangx/thsr-sniper:latest
+    image: seanchangx/thsr-sniper:dev
     container_name: thsr-sniper-scheduler
     volumes:
       - data:/app/data
@@ -34,15 +34,15 @@ services:
   # THSR Booking API service
   thsr-sniper-api:
     build: .
-    image: seanchangx/thsr-sniper:latest
+    image: seanchangx/thsr-sniper:dev
     container_name: thsr-sniper-api
     ports:
       - "8000:8000"
     volumes:
       - data:/app/data
+      - ./thsr_py:/app/thsr_py  # Mount source code for development
     environment:
       - PYTHONUNBUFFERED=1
-      - THSR_API_MODE=1
     restart: unless-stopped
     command: python main.py --start-api --api-host 0.0.0.0 --api-port 8000
     networks:
@@ -99,6 +99,7 @@ services:
       - "8001:8001"
     volumes:
       - data:/app/data
+      - ./auth_service:/app  # Mount source code for development
     environment:
       - PYTHONUNBUFFERED=1
       - SECRET_KEY=${SECRET_KEY}
@@ -122,16 +123,21 @@ services:
       retries: 3
       start_period: 40s
 
-  # React frontend
-  thsr-sniper-frontend:
-    build: ./frontend
-    image: seanchangx/thsr-sniper-frontend:latest
-    container_name: thsr-sniper-frontend
+  # Development React frontend with Vite hot reload
+  thsr-sniper-frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    image: seanchangx/thsr-sniper-frontend:dev
+    container_name: thsr-sniper-frontend-dev
     ports:
-      - "3000:80"
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     environment:
-      - VITE_API_URL=http://localhost:8000
-      - VITE_AUTH_URL=http://localhost:8001
+      - VITE_API_URL=/api
+      - VITE_AUTH_URL=/auth
     restart: unless-stopped
     networks:
       - default

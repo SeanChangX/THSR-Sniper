@@ -1,7 +1,20 @@
+# Web scraping and HTTP requests
 requests==2.32.3
+aiohttp>=3.8.0
 beautifulsoup4==4.12.3
+
+# Image processing and OCR
 opencv-python==4.10.0.84
 Pillow==10.4.0
+
+# Numerical computation and machine learning
 numpy>=1.24.0,<2.0.0
 tensorflow==2.17.0
+
+# Data visualization
 matplotlib>=3.5.0
+
+# Scheduler and API dependencies
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0

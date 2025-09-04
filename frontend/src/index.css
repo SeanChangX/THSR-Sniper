@@ -1,0 +1,242 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  * {
+    @apply border-gray-800;
+  }
+  
+  body {
+    @apply bg-bg-primary text-text-primary font-body;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  /* ROG Button Styles */
+  .rog-btn {
+    @apply inline-flex items-center justify-center px-6 py-3 text-sm font-medium rounded-lg transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-primary;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .rog-btn-primary {
+    @apply bg-rog-primary text-white hover:bg-rog-primary-dark focus:ring-rog-primary;
+  }
+  
+  .rog-btn-secondary {
+    @apply bg-bg-tertiary text-text-primary border border-rog-primary hover:bg-rog-primary hover:text-white focus:ring-rog-primary;
+  }
+  
+  .rog-btn-success {
+    @apply bg-rog-success text-bg-primary hover:bg-green-400 focus:ring-rog-success;
+  }
+  
+  .rog-btn-danger {
+    @apply bg-rog-danger text-white hover:bg-red-500 focus:ring-rog-danger;
+  }
+  
+  .rog-btn-warning {
+    @apply bg-rog-warning text-bg-primary hover:bg-yellow-400 focus:ring-rog-warning;
+  }
+  
+  .rog-btn-info {
+    @apply bg-rog-info text-white hover:bg-blue-600 focus:ring-rog-info;
+  }
+  
+  /* ROG Input Styles */
+  .rog-input {
+    @apply w-full px-4 py-3 bg-bg-input border border-gray-700 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-rog-primary focus:border-transparent transition-all duration-300;
+    font-family: 'Rajdhani', sans-serif;
+  }
+  
+
+  
+  .rog-select {
+    @apply rog-input appearance-none cursor-pointer;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff0050' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-position: right 12px center;
+    background-repeat: no-repeat;
+    background-size: 16px;
+    padding-right: 40px;
+  }
+  
+  /* ROG Card Styles */
+  .rog-card {
+    @apply bg-bg-card border border-gray-800 rounded-xl p-6 shadow-xl transition-all duration-300 hover:shadow-2xl;
+  }
+  
+  .rog-card-header {
+    @apply flex items-center justify-between mb-6;
+  }
+  
+  .rog-card-title {
+    @apply text-xl font-bold text-text-primary flex items-center gap-3;
+    font-family: 'Orbitron', monospace;
+  }
+  
+  .rog-card-title i {
+    @apply text-rog-primary;
+  }
+  
+  /* Status Indicators */
+  .status-dot {
+    @apply w-3 h-3 rounded-full;
+  }
+  
+  .status-dot.online {
+    @apply bg-rog-success animate-pulse;
+  }
+  
+  .status-dot.offline {
+    @apply bg-rog-danger;
+  }
+  
+  .status-dot.warning {
+    @apply bg-rog-warning animate-pulse;
+  }
+  
+  /* Form Groups */
+  .form-group {
+    @apply space-y-2;
+  }
+  
+  .form-label {
+    @apply block text-sm font-medium text-text-secondary;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 500;
+  }
+  
+  .form-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-4;
+  }
+  
+  /* Navigation */
+  .nav-tab {
+    @apply px-6 py-3 text-sm font-medium rounded-lg transition-all duration-300 flex items-center gap-3;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .nav-tab.active {
+    @apply bg-rog-primary text-white;
+  }
+  
+  .nav-tab:not(.active) {
+    @apply bg-bg-tertiary text-text-secondary hover:bg-bg-input hover:text-text-primary;
+  }
+  
+  /* Progress Bar */
+  .progress-bar {
+    @apply w-full bg-bg-input rounded-full h-3 overflow-hidden;
+  }
+  
+  .progress-fill {
+    @apply h-full bg-gradient-to-r from-rog-primary to-rog-accent transition-all duration-500 ease-out;
+  }
+  
+
+  
+  /* Loading Spinner */
+  .loading-spinner {
+    @apply animate-spin rounded-full h-8 w-8 border-2 border-gray-700 border-t-rog-primary;
+  }
+  
+  /* Modal */
+  .modal-overlay {
+    @apply fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50;
+  }
+  
+  .modal-content {
+    @apply bg-bg-card border border-rog-primary rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl;
+  }
+  
+  /* Table Styles */
+  .rog-table {
+    @apply w-full border-collapse border border-gray-800 rounded-lg overflow-hidden;
+  }
+  
+  .rog-table th {
+    @apply bg-bg-tertiary text-text-primary font-bold px-4 py-3 text-left border-b border-gray-700;
+    font-family: 'Rajdhani', sans-serif;
+  }
+  
+  .rog-table td {
+    @apply px-4 py-3 border-b border-gray-800 text-text-secondary;
+  }
+  
+  .rog-table tr:hover {
+    @apply bg-bg-input;
+  }
+  
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .rog-card {
+      @apply p-4;
+    }
+    
+    .form-grid {
+      @apply grid-cols-1;
+    }
+    
+    .rog-btn {
+      @apply w-full;
+    }
+    
+    /* Mobile header adjustments */
+    .nav-tab {
+      @apply px-3 py-2 text-xs;
+    }
+    
+    /* Notification panel responsive styles */
+    .notification-panel {
+      /* Mobile: full-screen-like with margins */
+      /* Desktop: small dropdown panel */
+    }
+  }
+  
+  /* Extra small screens */
+  @media (max-width: 480px) {
+    .rog-card {
+      @apply p-3;
+    }
+    
+    .rog-btn {
+      @apply px-4 py-2 text-xs;
+    }
+    
+    /* Make sure header elements don't overflow */
+    .header-content {
+      @apply min-w-0;
+    }
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1f1f1f;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ff0050;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #e60045;
+}

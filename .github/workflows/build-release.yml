@@ -37,20 +37,28 @@ jobs:
 
       - name: Build executable
         run: |
-          pyinstaller --onefile --name thsr-sniper-macos-apple-silicon \
+          pyinstaller --onedir --name thsr-sniper-macos-apple-silicon \
             --add-data "thsr_ocr:thsr_ocr" \
             --hidden-import=tensorflow \
             --hidden-import=numpy.core._multiarray_umath \
             --hidden-import=numpy.random._pickle \
             --hidden-import=numpy.lib.format \
             --collect-submodules=cv2 \
+            --optimize=2 \
+            --strip \
+            --noupx \
             main.py
+
+      - name: Create distribution package
+        run: |
+          cd dist
+          tar -czf thsr-sniper-macos-apple-silicon.tar.gz thsr-sniper-macos-apple-silicon/
 
       - name: Upload macOS Apple Silicon artifact
         uses: actions/upload-artifact@v4
         with:
           name: thsr-sniper-macos-apple-silicon
-          path: dist/thsr-sniper-macos-apple-silicon
+          path: dist/thsr-sniper-macos-apple-silicon.tar.gz
 
   build-windows:
     runs-on: windows-latest
@@ -73,13 +81,18 @@ jobs:
 
       - name: Build executable
         run: |
-          pyinstaller --onefile --name thsr-sniper-windows.exe --add-data "thsr_ocr;thsr_ocr" --hidden-import=tensorflow  --hidden-import=numpy.core._multiarray_umath --hidden-import=numpy.random._pickle --hidden-import=numpy.lib.format --collect-submodules=cv2 main.py
+          pyinstaller --onedir --name thsr-sniper-windows --add-data "thsr_ocr;thsr_ocr" --hidden-import=tensorflow --hidden-import=numpy.core._multiarray_umath --hidden-import=numpy.random._pickle --hidden-import=numpy.lib.format --collect-submodules=cv2 --optimize=2 --strip --noupx main.py
+
+      - name: Create distribution package
+        run: |
+          cd dist
+          7z a -tzip thsr-sniper-windows.zip thsr-sniper-windows/
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: thsr-sniper-windows
-          path: dist/thsr-sniper-windows.exe
+          path: dist/thsr-sniper-windows.zip
 
   create-release:
     needs: [build-macos-apple-silicon, build-windows]
@@ -123,8 +136,9 @@ jobs:
             ### 🍎 macOS (Apple Silicon)
             **Native executable**
             ```bash
-            # Download and run
-            chmod +x thsr-sniper-macos-apple-silicon
+            # Download and extract
+            tar -xzf thsr-sniper-macos-apple-silicon.tar.gz
+            cd thsr-sniper-macos-apple-silicon
             ./thsr-sniper-macos-apple-silicon --help
             ```
             
@@ -133,7 +147,8 @@ jobs:
             ### 🪟 Windows
             **Native executable**
             ```cmd
-            # Download and run
+            # Download and extract thsr-sniper-windows.zip
+            cd thsr-sniper-windows
             thsr-sniper-windows.exe --help
             ```
             
@@ -144,5 +159,5 @@ jobs:
             
             > **⚡ Recommendation**: Use Docker for the best experience across all platforms!
           files: |
-            artifacts/thsr-sniper-macos-apple-silicon/thsr-sniper-macos-apple-silicon
-            artifacts/thsr-sniper-windows/thsr-sniper-windows.exe
+            artifacts/thsr-sniper-macos-apple-silicon/thsr-sniper-macos-apple-silicon.tar.gz
+            artifacts/thsr-sniper-windows/thsr-sniper-windows.zip
