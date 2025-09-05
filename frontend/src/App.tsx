@@ -93,7 +93,7 @@ const App: React.FC = () => {
   // Remove forced timeout - let authentication check work naturally
 
   // Auto-fetch user data if authenticated
-  const { isLoading, isError, error } = useQuery(
+  const { isLoading, isError } = useQuery(
     'currentUser',
     authApi.getCurrentUser,
     {

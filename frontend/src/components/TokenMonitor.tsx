@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/authStore';
-import { isTokenExpired, getTokenExpiryInfo } from '@/utils/tokenUtils';
+import { getTokenExpiryInfo } from '@/utils/tokenUtils';
 
 interface TokenMonitorProps {
   onTokenExpired?: () => void;
@@ -8,7 +8,7 @@ interface TokenMonitorProps {
 
 const TokenMonitor: React.FC<TokenMonitorProps> = ({ onTokenExpired }) => {
   const { logout, isAuthenticated } = useAuthStore();
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
