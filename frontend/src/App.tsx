@@ -4,6 +4,8 @@ import { useQuery, useQueryClient } from 'react-query';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
 import VersionChecker from '@/components/VersionChecker';
+import TokenMonitor from '@/components/TokenMonitor';
+import { isTokenExpired } from '@/utils/tokenUtils';
 
 // Components
 import Layout from '@/components/Layout';
@@ -62,20 +64,25 @@ const App: React.FC = () => {
     };
   }, [logout, queryClient]);
 
-  // Session validation on app start - simplified logic
+  // Session validation on app start - check token expiry
   useEffect(() => {
-    const validateSession = async () => {
-      // Only clear stale data if we have tokens but are not authenticated
-      const hasToken = !!localStorage.getItem('auth_token') || !!token;
-      const hasAuthStorage = !!localStorage.getItem('auth-storage');
+    const validateSession = () => {
+      const token = localStorage.getItem('auth_token');
       
-      if ((hasToken || hasAuthStorage) && !isAuthenticated) {
-        console.log('Found stale session data, clearing...');
-        queryClient.clear();
-        localStorage.removeItem('auth-storage');
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('notificationHistory');
+      if (token) {
+        console.log('Checking token expiry on app start...');
+        if (isTokenExpired(token)) {
+          console.log('Token is expired, clearing session...');
+          queryClient.clear();
+          localStorage.removeItem('auth-storage');
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('notificationHistory');
+          // Force logout
+          logout();
+        } else {
+          console.log('Token is still valid');
+        }
       }
     };
 
@@ -83,25 +90,31 @@ const App: React.FC = () => {
     validateSession();
   }, []); // Remove dependencies to prevent infinite loops
 
+  // Remove forced timeout - let authentication check work naturally
+
   // Auto-fetch user data if authenticated
-  const { isLoading, isError } = useQuery(
+  const { isLoading, isError, error } = useQuery(
     'currentUser',
     authApi.getCurrentUser,
     {
       enabled: isAuthenticated && !!token,
-      retry: false,
-      staleTime: 0, // Always fetch fresh data
+      retry: false, // Disable retry to prevent infinite loops
+      staleTime: 0, // Always check fresh data
       onSuccess: (user) => {
+        console.log('User data fetched successfully:', user);
         setUser(user);
       },
       onError: (err) => {
         console.error('Failed to fetch user data:', err);
         // Only logout if it's an authentication error (401/403)
-        if (err && typeof err === 'object' && 'response' in err && 
-            ((err.response as any)?.status === 401 || (err.response as any)?.status === 403)) {
-          // Clear everything on auth error
-          queryClient.clear();
-          logout();
+        if (err && typeof err === 'object' && 'response' in err) {
+          const status = (err as any).response?.status;
+          if (status === 401 || status === 403) {
+            console.log('Authentication error detected, logging out...');
+            // Clear everything on auth error
+            queryClient.clear();
+            logout();
+          }
         }
       },
     }
@@ -117,9 +130,33 @@ const App: React.FC = () => {
     );
   }
 
+  // If we have an error and are authenticated, force logout immediately
+  if (isAuthenticated && !!token && isError) {
+    console.log('Authentication error detected, forcing logout immediately...');
+    // Force logout immediately
+    queryClient.clear();
+    logout();
+    return (
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+        <LoadingSpinner size="large" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-bg-primary">
       <VersionChecker />
+      <TokenMonitor 
+        onTokenExpired={() => {
+          console.log('Token expired, clearing session...');
+          queryClient.clear();
+          localStorage.removeItem('auth-storage');
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('notificationHistory');
+          logout();
+        }}
+      />
       <Routes>
         {/* Public Routes */}
         <Route 

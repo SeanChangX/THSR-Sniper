@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { isTokenExpired } from '@/utils/tokenUtils';
 
 interface VersionCheckerProps {
   onUpdateDetected?: () => void;
@@ -59,7 +60,25 @@ const VersionChecker: React.FC<VersionCheckerProps> = ({ onUpdateDetected }) => 
       }
     };
 
+    const checkTokenValidity = () => {
+      // Check if we have tokens but they might be expired
+      const token = localStorage.getItem('auth_token');
+      
+      if (token) {
+        console.log('Checking token validity on page load...');
+        if (isTokenExpired(token)) {
+          console.log('Token is expired, triggering logout...');
+          // Trigger logout event
+          window.dispatchEvent(new CustomEvent('auth-logout'));
+        } else {
+          console.log('Token is still valid');
+        }
+      }
+    };
+
+    // Run both checks
     checkVersion();
+    checkTokenValidity();
   }, [onUpdateDetected]);
 
   // Don't render anything, this is a background component

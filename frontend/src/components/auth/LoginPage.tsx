@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { useMutation } from 'react-query';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/store/authStore';
-import { authApi, authClient } from '@/services/api';
+import { authApi, authClient, apiClient } from '@/services/api';
 import { LoginCredentials } from '@/types';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
@@ -36,8 +36,9 @@ const LoginPage: React.FC = () => {
         
         // Set token in axios headers for immediate use
         authClient.defaults.headers.common['Authorization'] = `Bearer ${tokens.access_token}`;
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${tokens.access_token}`;
         
-        console.log('Set axios headers');
+        console.log('Set axios headers for both clients');
         
         // Get user data after successful login
         const user = await authApi.getCurrentUserWithToken(tokens.access_token);
