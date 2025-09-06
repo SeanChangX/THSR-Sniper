@@ -81,7 +81,7 @@ const addAuthInterceptor = (client: any) => {
         
         config.headers = config.headers || {};
         config.headers.Authorization = `Bearer ${token}`;
-        console.log('Token added to request:', config.url, 'Token:', token.substring(0, 20) + '...');
+        // console.log('Token added to request:', config.url, 'Token:', token.substring(0, 20) + '...');
       } else {
         // For protected endpoints, reject the request immediately
         if (config.url && !config.url.includes('/auth/') && !config.url.includes('/login') && !config.url.includes('/register')) {
@@ -167,11 +167,11 @@ const addResponseInterceptor = (client: any) => {
           // Check error message to determine appropriate user feedback
           const errorMessage = refreshError instanceof Error ? refreshError.message : 'Authentication failed';
           
-          console.log('Refresh token failed:', {
-            error: refreshError,
-            errorMessage,
-            authStorage: localStorage.getItem('auth-storage')
-          });
+          // console.log('Refresh token failed:', {
+          //   error: refreshError,
+          //   errorMessage,
+          //   authStorage: localStorage.getItem('auth-storage')
+          // });
           
           if (errorMessage === 'Authentication required') {
             console.log('Authentication required for protected resource - forcing logout');

@@ -101,7 +101,7 @@ const App: React.FC = () => {
       retry: false, // Disable retry to prevent infinite loops
       staleTime: 0, // Always check fresh data
       onSuccess: (user) => {
-        console.log('User data fetched successfully:', user);
+        // console.log('User data fetched successfully:', user);
         setUser(user);
       },
       onError: (err) => {

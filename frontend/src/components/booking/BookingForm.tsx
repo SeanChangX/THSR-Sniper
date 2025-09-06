@@ -95,14 +95,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ stations, timeSlots, thsrInfo
     
     const totalTickets = adultTickets + studentTickets + childTickets + seniorTickets + disabledTickets;
     
-    console.log('Ticket validation:', {
-      adult: adultTickets,
-      student: studentTickets,
-      child: childTickets,
-      senior: seniorTickets,
-      disabled: disabledTickets,
-      total: totalTickets
-    });
+    // console.log('Ticket validation:', {
+    //   adult: adultTickets,
+    //   student: studentTickets,
+    //   child: childTickets,
+    //   senior: seniorTickets,
+    //   disabled: disabledTickets,
+    //   total: totalTickets
+    // });
     
     if (totalTickets === 0) {
       toast.error('請至少選擇一張票');
