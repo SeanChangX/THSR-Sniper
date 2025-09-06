@@ -45,6 +45,14 @@ export const isTaskExpired = (taskDate: string): boolean => {
     // Set booking date to start of day for accurate comparison
     bookingDate.setHours(0, 0, 0, 0);
     
+    // // Debug logging
+    // console.log('Date comparison:', {
+    //   taskDate,
+    //   bookingDate: bookingDate.toISOString().split('T')[0],
+    //   today: today.toISOString().split('T')[0],
+    //   isExpired: bookingDate < today
+    // });
+    
     // Task is expired if booking date is before today
     return bookingDate < today;
   } catch (error) {
@@ -60,11 +68,11 @@ export const getEffectiveTaskStatus = (task: { status: string; date: string }): 
     return 'expired';
   }
   
-  // If task is still pending/running but departure date has passed, mark as expired
-  if ((task.status === 'pending' || task.status === 'running') && isTaskExpired(task.date)) {
+  // If departure date has passed, mark as expired regardless of current status
+  if (isTaskExpired(task.date)) {
     return 'expired';
   }
   
-  // For all other statuses, return the original status
+  // For all other cases, return the original status
   return task.status;
 };
