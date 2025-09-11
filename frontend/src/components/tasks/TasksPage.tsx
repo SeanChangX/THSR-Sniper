@@ -352,7 +352,7 @@ const TasksPage: React.FC = () => {
 
                   {/* Action Buttons */}
                   <div className="flex items-center gap-2 ml-4">
-                    {(effectiveStatus === 'pending' || effectiveStatus === 'running') && (
+                    {(effectiveStatus === 'pending' || effectiveStatus === 'running' || effectiveStatus === 'waiting') && (
                       <button
                         onClick={() => handleCancelTask(task.id)}
                         disabled={cancelTaskMutation.isLoading}

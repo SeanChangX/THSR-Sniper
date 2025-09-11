@@ -471,11 +471,21 @@ class _BookingPayload:
             print(f"Invalid date format, defaulting to {start_date}")
             self.outbound_date = start_date
             return
-        if start_date <= norm <= end_date:
+        
+        # If user specified a date, use it even if it's outside the current available range
+        # This handles cases where ticket sales haven't opened yet for future dates
+        if date_value is not None:
             self.outbound_date = norm
+            if not (start_date <= norm <= end_date):
+                print(f"Warning: Selected date {norm} is outside current available range ({start_date} to {end_date})")
+                print(f"Proceeding with selected date - this may be because ticket sales haven't opened yet")
         else:
-            print(f"Invalid date, defaulting to {start_date}")
-            self.outbound_date = start_date
+            # For interactive mode, still enforce the range
+            if start_date <= norm <= end_date:
+                self.outbound_date = norm
+            else:
+                print(f"Invalid date, defaulting to {start_date}")
+                self.outbound_date = start_date
 
     def select_time(self, time_idx: Optional[int]) -> None:
         if time_idx is None:
