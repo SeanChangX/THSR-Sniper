@@ -101,11 +101,18 @@ def is_ticket_sales_open(booking_date: str) -> bool:
 
 def parse_time_string(time_str: str) -> Optional[datetime]:
     """
-    Parse time string from train data (e.g., "0800", "1430") to datetime object.
+    Parse time string from train data (e.g., "0800", "1430", "07:58") to datetime object.
     Returns None if parsing fails.
     """
     try:
-        if len(time_str) == 4:
+        # Handle HH:MM format (e.g., "07:58")
+        if ':' in time_str:
+            hour, minute = time_str.split(':')
+            hour = int(hour)
+            minute = int(minute)
+            return datetime.now(TAIWAN_TZ).replace(hour=hour, minute=minute, second=0, microsecond=0)
+        # Handle HHMM format (e.g., "0800")
+        elif len(time_str) == 4:
             hour = int(time_str[:2])
             minute = int(time_str[2:])
             return datetime.now(TAIWAN_TZ).replace(hour=hour, minute=minute, second=0, microsecond=0)
