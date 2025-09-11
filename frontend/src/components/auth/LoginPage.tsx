@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { useMutation } from 'react-query';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '@/store/authStore';
-import { authApi, authClient } from '@/services/api';
+import { authApi, authClient, apiClient } from '@/services/api';
 import { LoginCredentials } from '@/types';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
@@ -23,29 +23,30 @@ const LoginPage: React.FC = () => {
   const loginMutation = useMutation(authApi.login, {
     onSuccess: async (tokens) => {
       try {
-        console.log('Login successful, received tokens:', { 
-          access_token: tokens.access_token.substring(0, 20) + '...',
-          token_type: tokens.token_type 
-        });
+        // console.log('Login successful, received tokens:', { 
+        //   access_token: tokens.access_token.substring(0, 20) + '...',
+        //   token_type: tokens.token_type 
+        // });
         
         // Store token immediately in localStorage for interceptors
         localStorage.setItem('auth_token', tokens.access_token);
         localStorage.setItem('refresh_token', tokens.refresh_token);
         
-        console.log('Stored tokens in localStorage');
+        // console.log('Stored tokens in localStorage');
         
         // Set token in axios headers for immediate use
         authClient.defaults.headers.common['Authorization'] = `Bearer ${tokens.access_token}`;
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${tokens.access_token}`;
         
-        console.log('Set axios headers');
+        // console.log('Set axios headers for both clients');
         
         // Get user data after successful login
         const user = await authApi.getCurrentUserWithToken(tokens.access_token);
-        console.log('Retrieved user data:', user);
+        // console.log('Retrieved user data:', user);
         
         // Set auth state
         setAuth(user, tokens);
-        console.log('Set auth state');
+        // console.log('Set auth state');
         
         toast.success('登入成功');
         

@@ -3,6 +3,9 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from 'react-query';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
+import VersionChecker from '@/components/VersionChecker';
+import TokenMonitor from '@/components/TokenMonitor';
+import { isTokenExpired } from '@/utils/tokenUtils';
 
 // Components
 import Layout from '@/components/Layout';
@@ -43,6 +46,8 @@ const App: React.FC = () => {
   const { isAuthenticated, setUser, logout, token } = useAuthStore();
   const queryClient = useQueryClient();
 
+  // Version check is now handled by VersionChecker component
+
   // Global authentication failure handler
   useEffect(() => {
     const handleAuthLogout = () => {
@@ -59,54 +64,78 @@ const App: React.FC = () => {
     };
   }, [logout, queryClient]);
 
-  // Session validation on app start
+  // Session validation on app start - check token expiry
   useEffect(() => {
-    const validateSession = async () => {
-      // Check if we have a token but no user data
-      const hasToken = !!localStorage.getItem('auth_token') || !!token;
-      const hasAuthStorage = !!localStorage.getItem('auth-storage');
+    const validateSession = () => {
+      const token = localStorage.getItem('auth_token');
       
-      if (hasToken || hasAuthStorage) {
-        // If we have tokens but not authenticated, clear everything
-        if (!isAuthenticated) {
-          console.log('Found stale session data, clearing...');
+      if (token) {
+        console.log('Checking token expiry on app start...');
+        if (isTokenExpired(token)) {
+          console.log('Token is expired, clearing session...');
           queryClient.clear();
           localStorage.removeItem('auth-storage');
           localStorage.removeItem('auth_token');
           localStorage.removeItem('refresh_token');
           localStorage.removeItem('notificationHistory');
+          // Force logout
+          logout();
+        } else {
+          console.log('Token is still valid');
         }
       }
     };
 
+    // Only run validation once on mount
     validateSession();
-  }, [isAuthenticated, token, queryClient]);
+  }, []); // Remove dependencies to prevent infinite loops
+
+  // Remove forced timeout - let authentication check work naturally
 
   // Auto-fetch user data if authenticated
-  const { isLoading } = useQuery(
+  const { isLoading, isError } = useQuery(
     'currentUser',
     authApi.getCurrentUser,
     {
       enabled: isAuthenticated && !!token,
-      retry: false,
+      retry: false, // Disable retry to prevent infinite loops
+      staleTime: 0, // Always check fresh data
       onSuccess: (user) => {
+        // console.log('User data fetched successfully:', user);
         setUser(user);
       },
       onError: (err) => {
         console.error('Failed to fetch user data:', err);
         // Only logout if it's an authentication error (401/403)
-        if (err && typeof err === 'object' && 'response' in err && 
-            ((err.response as any)?.status === 401 || (err.response as any)?.status === 403)) {
-          // Clear everything on auth error
-          queryClient.clear();
-          logout();
+        if (err && typeof err === 'object' && 'response' in err) {
+          const status = (err as any).response?.status;
+          if (status === 401 || status === 403) {
+            console.log('Authentication error detected, logging out...');
+            // Clear everything on auth error
+            queryClient.clear();
+            logout();
+          }
         }
       },
     }
   );
 
-  // Show loading spinner while checking authentication
-  if (isAuthenticated && isLoading) {
+  // Show loading spinner only when we have a token and are fetching user data
+  // Don't show loading if there's an error or if we're not authenticated
+  if (isAuthenticated && !!token && isLoading && !isError) {
+    return (
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+        <LoadingSpinner size="large" />
+      </div>
+    );
+  }
+
+  // If we have an error and are authenticated, force logout immediately
+  if (isAuthenticated && !!token && isError) {
+    console.log('Authentication error detected, forcing logout immediately...');
+    // Force logout immediately
+    queryClient.clear();
+    logout();
     return (
       <div className="min-h-screen bg-bg-primary flex items-center justify-center">
         <LoadingSpinner size="large" />
@@ -116,6 +145,18 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-bg-primary">
+      <VersionChecker />
+      <TokenMonitor 
+        onTokenExpired={() => {
+          console.log('Token expired, clearing session...');
+          queryClient.clear();
+          localStorage.removeItem('auth-storage');
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('notificationHistory');
+          logout();
+        }}
+      />
       <Routes>
         {/* Public Routes */}
         <Route 

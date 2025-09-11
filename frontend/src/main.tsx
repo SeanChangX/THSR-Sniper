@@ -35,7 +35,7 @@ const queryClient = new QueryClient({
         // Only retry once for server errors
         return failureCount < 1;
       },
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 0, // Always fetch fresh data to prevent cache issues
       onError: (error: any) => {
         // Check if it's an authentication error
         const status = error?.response?.status;

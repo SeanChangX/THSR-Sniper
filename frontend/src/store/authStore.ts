@@ -34,7 +34,7 @@ export const useAuthStore = create<AuthState>()(
           refreshToken: tokens.refresh_token,
           isAuthenticated: true,
         });
-        // Store token for persistence
+        // Store token for persistence - only in localStorage, let zustand handle the rest
         if (typeof window !== 'undefined') {
           localStorage.setItem('auth_token', tokens.access_token);
           localStorage.setItem('refresh_token', tokens.refresh_token);

@@ -66,28 +66,17 @@ Examples:
   python main.py --from 2 --to 11 --adult 1 --date 2026/01/01
 
   # Scheduled booking (requires API server running)
-  python main.py --schedule --from 2 --to 11 --adult 1 --date +1 \
+  python main.py --schedule --from 2 --to 11 --adult 1 --date +1
                  --id A123456789 --member n --interval 5
-
-  # Task management (requires API server running)
-  python main.py --list-tasks
-  python main.py --task-status TASK_ID
-  python main.py --cancel-task TASK_ID
 
   # View options
   python main.py --stations
   python main.py --times
 
-  # Start API server
-  python main.py --start-api --api-port 8000
-
   # Advanced booking
   python main.py --from 1 --to 12 --date 2026/01/01 --time 10
                  --adult 1 --seat 1 --class 0 --train 1
                  --id A123456789 --member n
-
-  # Watchdog service (standalone)
-  python watchdog.py
         """
     )
 

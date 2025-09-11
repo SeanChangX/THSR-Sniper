@@ -1,5 +1,6 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { toast } from 'react-toastify';
+import { isTokenExpired } from '@/utils/tokenUtils';
 import { 
   User, Token, LoginCredentials, RegisterData, UserUpdate, 
   PasswordChange, THSRInfo, StationInfo, TimeSlotInfo,
@@ -71,9 +72,16 @@ const addAuthInterceptor = (client: any) => {
       
       // Always add token if available
       if (token) {
+        // Check if token is expired before adding to request
+        if (isTokenExpired(token)) {
+          console.log('Token is expired, triggering logout...');
+          handleAuthenticationFailure();
+          return Promise.reject(new Error('Token expired'));
+        }
+        
         config.headers = config.headers || {};
         config.headers.Authorization = `Bearer ${token}`;
-        // Token added for protected endpoint
+        // console.log('Token added to request:', config.url, 'Token:', token.substring(0, 20) + '...');
       } else {
         // For protected endpoints, reject the request immediately
         if (config.url && !config.url.includes('/auth/') && !config.url.includes('/login') && !config.url.includes('/register')) {
@@ -128,14 +136,25 @@ const addResponseInterceptor = (client: any) => {
           });
 
           const newToken = response.data.access_token;
+          const newRefreshToken = response.data.refresh_token;
           
           // Update stored token
           const parsedAuthStorage = JSON.parse(authStorage!);
           if (parsedAuthStorage.state) {
             parsedAuthStorage.state.token = newToken;
-            parsedAuthStorage.state.refreshToken = response.data.refresh_token;
+            parsedAuthStorage.state.refreshToken = newRefreshToken;
             localStorage.setItem('auth-storage', JSON.stringify(parsedAuthStorage));
             localStorage.setItem('auth_token', newToken);
+            localStorage.setItem('refresh_token', newRefreshToken);
+          }
+
+          // Update axios default headers for both clients
+          client.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+          // Also update the other client
+          if (client === authClient) {
+            apiClient.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+          } else if (client === apiClient) {
+            authClient.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
           }
 
           processQueue(null, newToken);
@@ -148,21 +167,22 @@ const addResponseInterceptor = (client: any) => {
           // Check error message to determine appropriate user feedback
           const errorMessage = refreshError instanceof Error ? refreshError.message : 'Authentication failed';
           
-          console.log('Refresh token failed:', {
-            error: refreshError,
-            errorMessage,
-            authStorage: localStorage.getItem('auth-storage')
-          });
+          // console.log('Refresh token failed:', {
+          //   error: refreshError,
+          //   errorMessage,
+          //   authStorage: localStorage.getItem('auth-storage')
+          // });
           
           if (errorMessage === 'Authentication required') {
-            console.log('Authentication required for protected resource - silent redirect');
-            // Don't show toast for unauthenticated users, just redirect
+            console.log('Authentication required for protected resource - forcing logout');
+            // Don't show toast for unauthenticated users, just logout
           } else {
             console.log('Session expired, forcing logout...');
             // Only show toast if user was actually authenticated
             toast.error('Your session has expired. Please login again.');
           }
           
+          // Force logout immediately
           handleAuthenticationFailure();
           
           return Promise.reject(refreshError);
@@ -176,6 +196,13 @@ const addResponseInterceptor = (client: any) => {
         console.log('Access forbidden - insufficient permissions');
         toast.error('You do not have permission to access this resource.');
         // Don't force logout for 403 - user is authenticated but lacks permission
+        return Promise.reject(error);
+      }
+
+      // Handle any other 401 errors that weren't caught above
+      if (error.response?.status === 401) {
+        console.log('401 error detected, forcing logout...');
+        handleAuthenticationFailure();
         return Promise.reject(error);
       }
 

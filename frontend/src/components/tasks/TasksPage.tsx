@@ -5,7 +5,7 @@ import { thsrApi } from '@/services/api';
 import { BOOKING_STATUS } from '@/types';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { formatStationRoute } from '@/utils/stations';
-import { formatDateTimeWithTimezone } from '@/utils/dateTime';
+import { formatDateTimeWithTimezone, getEffectiveTaskStatus } from '@/utils/dateTime';
 
 // Helper function to format passenger counts
 const formatPassengerCounts = (task: any) => {
@@ -199,7 +199,9 @@ const TasksPage: React.FC = () => {
           >
             全部
           </button>
-          {Object.entries(BOOKING_STATUS).map(([key, label]) => (
+          {Object.entries(BOOKING_STATUS)
+            .filter(([key]) => key !== 'expired')
+            .map(([key, label]) => (
             <button
               key={key}
               onClick={() => setSelectedStatus(key)}
@@ -223,15 +225,17 @@ const TasksPage: React.FC = () => {
           </div>
         ) : tasksData?.results && tasksData.results.length > 0 ? (
           <div className="space-y-4">
-            {tasksData.results.map((task) => (
+            {tasksData.results.map((task) => {
+              const effectiveStatus = getEffectiveTaskStatus(task);
+              return (
               <div key={task.id} className="border border-gray-700 rounded-lg p-4 hover:border-rog-primary/30 transition-colors">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className={`flex items-center gap-2 ${getStatusColor(task.status)}`}>
-                        {getStatusIcon(task.status)}
+                      <div className={`flex items-center gap-2 ${getStatusColor(effectiveStatus)}`}>
+                        {getStatusIcon(effectiveStatus)}
                         <span className="font-medium">
-                          {BOOKING_STATUS[task.status as keyof typeof BOOKING_STATUS]}
+                          {BOOKING_STATUS[effectiveStatus as keyof typeof BOOKING_STATUS]}
                         </span>
                       </div>
                       <span className="text-text-muted text-sm">
@@ -274,7 +278,7 @@ const TasksPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {task.status === 'success' && (
+                    {effectiveStatus === 'success' && (
                       <div className="bg-rog-success/10 border border-rog-success/30 rounded-lg p-3 mb-3">
                         <p className="text-rog-success font-medium">
                           訂票成功！PNR代碼：{cleanPNR(task.success_pnr || task.result)}
@@ -282,10 +286,18 @@ const TasksPage: React.FC = () => {
                       </div>
                     )}
 
-                    {task.status === 'failed' && task.error && (
+                    {effectiveStatus === 'failed' && task.error && (
                       <div className="bg-rog-danger/10 border border-rog-danger/30 rounded-lg p-3 mb-3">
                         <p className="text-rog-danger">
                           錯誤：{task.error}
+                        </p>
+                      </div>
+                    )}
+
+                    {effectiveStatus === 'expired' && task.status !== 'expired' && (
+                      <div className="bg-rog-warning/10 border border-rog-warning/30 rounded-lg p-3 mb-3">
+                        <p className="text-rog-warning font-medium">
+                          此任務已過期（出發日期已過）
                         </p>
                       </div>
                     )}
@@ -299,7 +311,7 @@ const TasksPage: React.FC = () => {
 
                   {/* Action Buttons */}
                   <div className="flex items-center gap-2 ml-4">
-                    {(task.status === 'pending' || task.status === 'running') && (
+                    {(effectiveStatus === 'pending' || effectiveStatus === 'running') && (
                       <button
                         onClick={() => handleCancelTask(task.id)}
                         disabled={cancelTaskMutation.isLoading}
@@ -316,7 +328,7 @@ const TasksPage: React.FC = () => {
                       </button>
                     )}
                     
-                    {(task.status === 'success' || task.status === 'failed' || task.status === 'cancelled' || task.status === 'expired') && (
+                    {(effectiveStatus === 'success' || effectiveStatus === 'failed' || effectiveStatus === 'cancelled' || effectiveStatus === 'expired') && (
                       <button
                         onClick={() => handleRemoveTask(task.id)}
                         disabled={removeTaskMutation.isLoading}
@@ -335,7 +347,8 @@ const TasksPage: React.FC = () => {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-12">
