@@ -134,7 +134,7 @@ class SchedulerWatchdog:
     def _print_startup_status(self) -> None:
         """Print startup status information."""
         tasks = self.scheduler.list_tasks()
-        active_tasks = [t for t in tasks if t.status in [BookingStatus.PENDING, BookingStatus.RUNNING]]
+        active_tasks = [t for t in tasks if t.status in [BookingStatus.PENDING, BookingStatus.RUNNING, BookingStatus.WAITING]]
         
         print(f"\n{'='*60}")
         print(f"  THSR Scheduler Watchdog Started")
@@ -186,7 +186,7 @@ class SchedulerWatchdog:
         expired_count = 0
         
         for task in tasks:
-            if task.status in [BookingStatus.PENDING, BookingStatus.RUNNING] and task.is_expired():
+            if task.status in [BookingStatus.PENDING, BookingStatus.RUNNING, BookingStatus.WAITING] and task.is_expired():
                 task.status = BookingStatus.EXPIRED
                 expired_count += 1
                 self.logger.info(f"Marked task {task.id[:8]}... as expired (date: {task.date})")

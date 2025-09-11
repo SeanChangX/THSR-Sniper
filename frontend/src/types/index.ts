@@ -106,11 +106,18 @@ export interface TaskStatusResponse {
   success_pnr?: string;
   error_message?: string;
   created_at: string;
+  time?: number;
+  train_index?: number;
+  adult_cnt?: number;
+  student_cnt?: number;
+  child_cnt?: number;
+  senior_cnt?: number;
+  disabled_cnt?: number;
 }
 
 export interface BookingTask {
   id: string;
-  status: 'pending' | 'running' | 'success' | 'failed' | 'cancelled' | 'expired';
+  status: 'pending' | 'running' | 'success' | 'failed' | 'cancelled' | 'expired' | 'waiting';
   from_station: number;
   to_station: number;
   date: string;
@@ -222,6 +229,7 @@ export const CLASS_TYPES = {
 } as const;
 
 export const BOOKING_STATUS = {
+  waiting: '等待開票',
   pending: '等待中',
   running: '執行中',
   success: '成功',

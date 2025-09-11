@@ -10,7 +10,7 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 
-from .schema import STATION_MAP, TIME_TABLE, TicketType
+from .schema import STATION_MAP, TIME_TABLE, TicketType, find_closest_train_within_range
 
 BASE_URL = "https://irs.thsrc.com.tw"
 BOOKING_PAGE_URL = f"{BASE_URL}/IMINT/?locale=tw"
@@ -344,7 +344,8 @@ def run(args) -> None:
     # Second page
     _print_section("Step 5: Train Selection")
     train_index = getattr(args, "train_index", None)
-    soup = _confirm_train_flow(session, soup, train_index)
+    target_time_idx = getattr(args, "time", None)
+    soup = _confirm_train_flow(session, soup, train_index, target_time_idx)
     if soup is None:
         return
 
@@ -559,7 +560,7 @@ class _BookingPayload:
                 self.security_code = ""
 
 
-def _confirm_train_flow(session: requests.Session, soup: BeautifulSoup, train_index: Optional[int] = None) -> Optional[BeautifulSoup]:
+def _confirm_train_flow(session: requests.Session, soup: BeautifulSoup, train_index: Optional[int] = None, target_time_idx: Optional[int] = None) -> Optional[BeautifulSoup]:
     alerts = [e.get_text(strip=True) for e in soup.select("ul.alert-body > li")]
     if alerts:
         print("\n".join(alerts))
@@ -577,6 +578,17 @@ def _confirm_train_flow(session: requests.Session, soup: BeautifulSoup, train_in
         selected_train = trains[train_index - 1]["form_value"]
         train_id = trains[train_index - 1]["id"]
         print(f"✓ Selected train {train_id} (index {train_index}) automatically")
+    elif target_time_idx and target_time_idx >= 1 and target_time_idx <= len(TIME_TABLE):
+        # Auto-booking mode: find closest train within ±30 minutes of target time
+        closest_train = find_closest_train_within_range(trains, target_time_idx, tolerance_hours=0.5)
+        if closest_train:
+            selected_train = closest_train["form_value"]
+            train_id = closest_train["id"]
+            depart_time = closest_train["depart"]
+            print(f"✓ Auto-selected closest train {train_id} at {depart_time} (within ±30 minutes of target time)")
+        else:
+            print("✗ Error: No trains available within ±30 minutes of the target time")
+            return None
     else:
         # Manual selection
         selected_train = _select_train(trains)
