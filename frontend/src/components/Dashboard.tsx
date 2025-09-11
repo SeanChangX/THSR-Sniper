@@ -275,6 +275,7 @@ const Dashboard: React.FC = () => {
                     task.status === 'success' ? 'bg-rog-success' :
                     task.status === 'failed' ? 'bg-rog-danger' :
                     task.status === 'running' ? 'bg-rog-info animate-pulse' :
+                    task.status === 'waiting' ? 'bg-rog-info' :
                     'bg-rog-warning'
                   }`}></div>
                   <div>
@@ -291,6 +292,7 @@ const Dashboard: React.FC = () => {
                     task.status === 'success' ? 'text-rog-success' :
                     task.status === 'failed' ? 'text-rog-danger' :
                     task.status === 'running' ? 'text-rog-info' :
+                    task.status === 'waiting' ? 'text-rog-info' :
                     'text-rog-warning'
                   }`}>
                     {BOOKING_STATUS[task.status as keyof typeof BOOKING_STATUS] || '未知'}

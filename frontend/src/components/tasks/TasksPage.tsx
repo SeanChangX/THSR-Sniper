@@ -37,6 +37,20 @@ const cleanPNR = (pnr: string | null | undefined): string => {
   return pnr.replace(/\u001b\[[0-9;]*m/g, '').trim();
 };
 
+// Helper function to format departure time
+const formatDepartureTime = (timeIndex: number | undefined, timeSlots: any[]): string => {
+  if (!timeIndex || !timeSlots || timeSlots.length === 0) {
+    return '不指定時間';
+  }
+  
+  const timeSlot = timeSlots.find(slot => slot.id === timeIndex);
+  if (timeSlot) {
+    return `${timeSlot.formatted_time} (${timeSlot.time})`;
+  }
+  
+  return `時間索引 ${timeIndex}`;
+};
+
 const TasksPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
@@ -66,6 +80,19 @@ const TasksPage: React.FC = () => {
       onError: (error: any) => {
         if (error.response?.status === 401 || error.response?.status === 403) {
           console.log('Authentication error in stations query');
+          // Error will be handled by global query client
+        }
+      }
+    }
+  );
+
+  const { data: timeSlots = [] } = useQuery(
+    'timeSlots', 
+    thsrApi.getTimeSlots,
+    {
+      onError: (error: any) => {
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          console.log('Authentication error in timeSlots query');
           // Error will be handled by global query client
         }
       }
@@ -116,6 +143,8 @@ const TasksPage: React.FC = () => {
         return 'text-rog-info';
       case 'pending':
         return 'text-rog-warning';
+      case 'waiting':
+        return 'text-rog-info';
       case 'cancelled':
         return 'text-text-muted';
       case 'expired':
@@ -146,6 +175,12 @@ const TasksPage: React.FC = () => {
           </svg>
         );
       case 'pending':
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        );
+      case 'waiting':
         return (
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -253,6 +288,12 @@ const TasksPage: React.FC = () => {
                       <div>
                         <p className="text-text-muted text-sm">出發日期</p>
                         <p className="text-text-primary">{task.date}</p>
+                      </div>
+                      <div>
+                        <p className="text-text-muted text-sm">出發時間</p>
+                        <p className="text-text-primary">
+                          {formatDepartureTime(task.time, timeSlots)}
+                        </p>
                       </div>
                       <div>
                         <p className="text-text-muted text-sm">乘客</p>

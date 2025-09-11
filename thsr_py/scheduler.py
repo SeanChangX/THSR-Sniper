@@ -14,7 +14,7 @@ import fcntl
 import os
 
 from .flows import run as run_booking_flow
-from .schema import STATION_MAP, TIME_TABLE, TicketType
+from .schema import STATION_MAP, TIME_TABLE, TicketType, is_ticket_sales_open, get_taiwan_now
 
 
 class BookingStatus(Enum):
@@ -25,6 +25,7 @@ class BookingStatus(Enum):
     EXPIRED = "expired"
     CANCELLED = "cancelled"
     DELETED = "deleted"
+    WAITING = "waiting"
 
 
 @dataclass
@@ -482,6 +483,18 @@ class BookingScheduler:
                 task.error_message = "Maximum attempts reached"
                 self.logger.info(f"Task {task.id} stopped after {task.attempts} attempts")
                 continue
+            
+            # Check if ticket sales are open for future booking dates
+            if not is_ticket_sales_open(task.date):
+                if task.status != BookingStatus.WAITING:
+                    task.status = BookingStatus.WAITING
+                    self.logger.info(f"Task {task.id} waiting for ticket sales to open at 00:00 Taiwan time")
+                continue
+            
+            # If task was waiting and ticket sales are now open, change to pending
+            if task.status == BookingStatus.WAITING:
+                task.status = BookingStatus.PENDING
+                self.logger.info(f"Task {task.id} ticket sales now open, resuming booking attempts")
             
             # Check if it's time to run this task
             if task.last_attempt is None:
