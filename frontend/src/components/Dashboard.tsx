@@ -5,6 +5,7 @@ import { thsrApi } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { formatStationRoute } from '@/utils/stations';
+import { BOOKING_STATUS } from '@/types';
 
 // Helper function to clean ANSI color codes from PNR
 const cleanPNR = (pnr: string | null | undefined): string => {
@@ -292,11 +293,7 @@ const Dashboard: React.FC = () => {
                     task.status === 'running' ? 'text-rog-info' :
                     'text-rog-warning'
                   }`}>
-                    {task.status === 'success' ? '成功' :
-                     task.status === 'failed' ? '失敗' :
-                     task.status === 'running' ? '執行中' :
-                     task.status === 'pending' ? '等待中' :
-                     task.status === 'cancelled' ? '已取消' : '已過期'}
+                    {BOOKING_STATUS[task.status as keyof typeof BOOKING_STATUS] || '未知'}
                   </p>
                   {task.status === 'success' && (task.result || (task as any).success_pnr) && (
                     <p className="text-text-muted text-xs">

@@ -199,7 +199,9 @@ const TasksPage: React.FC = () => {
           >
             全部
           </button>
-          {Object.entries(BOOKING_STATUS).map(([key, label]) => (
+          {Object.entries(BOOKING_STATUS)
+            .filter(([key]) => key !== 'expired')
+            .map(([key, label]) => (
             <button
               key={key}
               onClick={() => setSelectedStatus(key)}
