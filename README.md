@@ -33,8 +33,57 @@
 # Clone the repository
 git clone https://github.com/SeanChangX/THSR-Sniper.git
 cd THSR-Sniper
+```
 
-# Build the services (optional)
+### Initial Configuration
+
+Before starting the services for the first time, you need to set up the environment configuration:
+
+#### 1. Generate Security Keys
+
+Run the key generator script to generate secure JWT and encryption keys:
+
+```bash
+python3 generate_keys.py
+```
+
+This will create a `.env` file with:
+- `SECRET_KEY` - JWT authentication secret key (randomly generated)
+- `ENCRYPTION_KEY` - Data encryption key (randomly generated)
+
+#### 2. Add MySQL Configuration
+
+Append MySQL configuration to `.env` file:
+
+```bash
+# Append MySQL settings from env.example
+cat env.example | grep -A 4 "MySQL Database" >> .env
+```
+
+Or manually edit `.env` and add these lines:
+```env
+# MySQL Database Configuration
+MYSQL_ROOT_PASSWORD=thsr_sniper_root
+MYSQL_DATABASE=thsr_sniper
+MYSQL_USER=user
+MYSQL_PASSWORD=password
+```
+
+Default MySQL settings will be used if not specified. For production environments, it is recommended to change the passwords.
+
+#### 3. Frontend Configuration (Optional)
+
+Frontend uses default API endpoints that work with standard Docker setup:
+
+```bash
+# Copy frontend environment template (optional, if customization needed)
+cp frontend/env.example frontend/.env
+```
+
+#### 4. Build Services (Optional)
+
+```bash
+# Build the services
 docker compose build
 ```
 
