@@ -1,4 +1,12 @@
 
+[English](README.md) | [繁體中文](README.zh-TW.md)
+
+![Stars](https://img.shields.io/github/stars/SeanChangX/THSR-Sniper)
+![Release](https://img.shields.io/github/v/release/SeanChangX/THSR-Sniper)
+![Downloads](https://img.shields.io/github/downloads/SeanChangX/THSR-Sniper/total)
+![Docker Pulls](https://img.shields.io/docker/pulls/seanchangx/thsr-sniper?logo=docker&logoColor=white&label=seanchangx%2Fthsr-sniper)
+![License](https://img.shields.io/github/license/SeanChangX/THSR-Sniper)
+
 # THSR-Sniper
 
 ```
